@@ -1,0 +1,12 @@
+{
+  "name": "afterglow",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "pnpm --dir apps/web dev",
+    "build": "pnpm --dir apps/web build",
+    "test:web": "pnpm --dir apps/web test",
+    "test": "pnpm test:web"
+  }
+}
+
