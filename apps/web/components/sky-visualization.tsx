@@ -4,16 +4,17 @@ type Props = {
   palette: string[];
   cloudCover: number;
   compact?: boolean;
+  interpretationLabel?: string;
 };
 
-export function SkyVisualization({ palette, cloudCover, compact = false }: Props) {
+export function SkyVisualization({ palette, cloudCover, compact = false, interpretationLabel = "Forecast interpretation" }: Props) {
   const colors = palette.length >= 5 ? palette : ["#F8D6AE", "#F4B184", "#E88772", "#B9798D", "#6F6A9B"];
   return (
     <div
       className={`sky ${compact ? "sky--compact" : ""}`}
       style={{ background: `linear-gradient(180deg, ${colors[4]} 0%, ${colors[3]} 33%, ${colors[1]} 69%, ${colors[0]} 100%)` }}
       role="img"
-      aria-label="An artistic interpretation of the predicted sunset colors"
+      aria-label={interpretationLabel}
     >
       <div
         className="sun-orb"
@@ -28,7 +29,7 @@ export function SkyVisualization({ palette, cloudCover, compact = false }: Props
         style={{ opacity: 0.05 + cloudCover / 380 }}
       />
       <div className="horizon" />
-      {!compact && <span className="visual-label">Forecast interpretation</span>}
+      {!compact && <span className="visual-label">{interpretationLabel}</span>}
     </div>
   );
 }

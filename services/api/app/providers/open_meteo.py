@@ -52,10 +52,10 @@ class OpenMeteoClient:
                     await asyncio.sleep(0.2 * (2**attempt))
         raise WeatherProviderError("Open-Meteo is temporarily unavailable") from last_error
 
-    async def search_locations(self, query: str, count: int = 8) -> list[dict[str, Any]]:
+    async def search_locations(self, query: str, count: int = 8, language: str = "en") -> list[dict[str, Any]]:
         payload = await self._request(
             self.geocoding_url,
-            {"name": query, "count": min(count, 10), "language": "en", "format": "json"},
+            {"name": query, "count": min(count, 10), "language": language if language in {"en", "zh"} else "en", "format": "json"},
         )
         results = []
         for item in payload.get("results", []):

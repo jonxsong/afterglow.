@@ -5,6 +5,7 @@ import { LocateFixed, MapPin, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { searchLocations } from "@/lib/api";
 import type { Location } from "@/lib/types";
+import { useLocale } from "./locale-provider";
 
 type Props = {
   onSelect: (location: Location) => void;
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function LocationSearch({ onSelect, recent }: Props) {
+  const { locale, t } = useLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -28,8 +30,8 @@ export function LocationSearch({ onSelect, recent }: Props) {
   }, [open]);
 
   const results = useQuery({
-    queryKey: ["locations", debounced],
-    queryFn: () => searchLocations(debounced),
+    queryKey: ["locations", debounced, locale],
+    queryFn: () => searchLocations(debounced, locale),
     enabled: debounced.length >= 2,
   });
 
@@ -41,22 +43,22 @@ export function LocationSearch({ onSelect, recent }: Props) {
 
   function useCurrentLocation() {
     if (!navigator.geolocation) {
-      setGeoMessage("Location is not available in this browser.");
+      setGeoMessage(t("unavailableLocation"));
       return;
     }
-    setGeoMessage("Finding your horizon…");
+    setGeoMessage(t("findingHorizon"));
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         choose({
-          name: "Current location",
+          name: t("currentLocationName"),
           country: "",
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           timezone,
         });
       },
-      () => setGeoMessage("Permission was not granted. You can still search for a city."),
+      () => setGeoMessage(t("permissionDenied")),
       { timeout: 8000 },
     );
   }
@@ -64,24 +66,24 @@ export function LocationSearch({ onSelect, recent }: Props) {
   return (
     <>
       <button className="location-trigger" onClick={() => setOpen(true)}>
-        <MapPin size={16} aria-hidden /> Change location
+        <MapPin size={16} aria-hidden /> {t("changeLocation")}
       </button>
       {open && (
-        <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Choose a location">
+        <div className="search-overlay" role="dialog" aria-modal="true" aria-label={t("chooseLocation")}>
           <div className="search-panel">
-            <button className="icon-button search-close" onClick={() => setOpen(false)} aria-label="Close location search"><X /></button>
-            <p className="eyebrow">FIND YOUR SKY</p>
-            <h2>Where will you watch?</h2>
+            <button className="icon-button search-close" onClick={() => setOpen(false)} aria-label={t("closeLocation")}><X /></button>
+            <p className="eyebrow">{t("findSky")}</p>
+            <h2>{t("watchWhere")}</h2>
             <label className="search-field">
               <Search size={20} aria-hidden />
-              <span className="sr-only">Search city or region</span>
-              <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="City or region" />
+              <span className="sr-only">{t("searchRegion")}</span>
+              <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cityRegion")} />
             </label>
-            <button className="current-location" onClick={useCurrentLocation}><LocateFixed size={18} /> Use my current location</button>
+            <button className="current-location" onClick={useCurrentLocation}><LocateFixed size={18} /> {t("currentLocation")}</button>
             {geoMessage && <p className="search-note" role="status">{geoMessage}</p>}
             <div className="search-results">
-              {results.isFetching && <p className="search-note">Looking across the map…</p>}
-              {results.error && <p className="search-error">{results.error.message}</p>}
+              {results.isFetching && <p className="search-note">{t("searchingMap")}</p>}
+              {results.error && <p className="search-error">{locale === "zh" ? t("locationSearchUnavailable") : results.error.message}</p>}
               {results.data?.map((location) => (
                 <button key={`${location.latitude}-${location.longitude}`} onClick={() => choose(location)}>
                   <MapPin size={17} />
@@ -90,7 +92,7 @@ export function LocationSearch({ onSelect, recent }: Props) {
               ))}
               {!query && recent.length > 0 && (
                 <>
-                  <p className="results-heading">RECENT</p>
+                  <p className="results-heading">{t("recent")}</p>
                   {recent.map((location) => (
                     <button key={`${location.latitude}-${location.longitude}`} onClick={() => choose(location)}>
                       <MapPin size={17} /><span><strong>{location.name}</strong><small>{location.region || location.country}</small></span>

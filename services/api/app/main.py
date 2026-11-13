@@ -80,8 +80,12 @@ def ready(db: Session = Depends(get_db)) -> dict[str, str]:
 
 
 @app.get("/api/v1/locations/search", response_model=list[LocationResult])
-async def search_locations(q: str = Query(min_length=2, max_length=120), limit: int = Query(8, ge=1, le=10)):
-    return await OpenMeteoClient().search_locations(q, limit)
+async def search_locations(
+    q: str = Query(min_length=2, max_length=120),
+    limit: int = Query(8, ge=1, le=10),
+    language: str = Query("en", pattern="^(en|zh)$"),
+):
+    return await OpenMeteoClient().search_locations(q, limit, language)
 
 
 def _location_data(

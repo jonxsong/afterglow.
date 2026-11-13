@@ -1,4 +1,5 @@
 import type { Evaluation, Forecast, Location, WeeklyForecast } from "./types";
+import type { Locale } from "@/components/locale-provider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -12,9 +13,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function searchLocations(query: string): Promise<Location[]> {
-  if (!API_URL) return searchOpenMeteoLocations(query);
-  return request(`/api/v1/locations/search?q=${encodeURIComponent(query)}`);
+export function searchLocations(query: string, locale: Locale = "en"): Promise<Location[]> {
+  if (!API_URL) return searchOpenMeteoLocations(query, locale);
+  return request(`/api/v1/locations/search?q=${encodeURIComponent(query)}&language=${locale}`);
 }
 
 function locationQuery(location: Location): string {
@@ -59,8 +60,8 @@ type OpenMeteoPayload = {
   daily: { sunset: string[] };
 };
 
-async function searchOpenMeteoLocations(query: string): Promise<Location[]> {
-  const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=en&format=json`);
+async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<Location[]> {
+  const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=${locale}&format=json`);
   if (!response.ok) throw new Error("Location search is temporarily unavailable.");
   const payload = await response.json();
   return (payload.results ?? []).filter((item: Record<string, unknown>) => item.name && item.country && item.timezone).map((item: Record<string, unknown>) => ({
