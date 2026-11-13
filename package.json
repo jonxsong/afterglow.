@@ -5,8 +5,15 @@
   "scripts": {
     "dev": "pnpm --dir apps/web dev",
     "build": "pnpm --dir apps/web build",
+    "build:site": "cross-env STATIC_EXPORT=1 NEXT_PUBLIC_API_URL= pnpm --dir apps/web build && node scripts/build-site-worker.mjs",
+    "preview:site": "node --env-file=.env.local scripts/serve-site-worker.mjs",
+    "smoke:ai": "node --env-file=.env.local scripts/smoke-ai.mjs",
     "test:web": "pnpm --dir apps/web test",
-    "test": "pnpm test:web"
+    "test:worker": "node --test tests/site-worker.test.mjs",
+    "test": "pnpm test:web && pnpm test:worker"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }
 

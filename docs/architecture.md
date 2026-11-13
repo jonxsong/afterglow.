@@ -21,11 +21,22 @@ The baseline is deterministic and is always labeled **heuristic**. The offline t
 pipeline is intentionally disconnected from production inference until a real labeled
 dataset exists and a leakage-safe evaluation shows improvement.
 
+## Public Site and AI reading
+
+The public `.chatgpt.site` build keeps forecasting deterministic and fetches Open-Meteo
+directly. A lightweight Site worker serves the exported Next.js assets and exposes one
+protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
+comparison locally. Only after the visitor explicitly requests an AI reading does it resize
+the photograph and send that copy to the worker. The worker validates the payload, applies
+per-client throttling, and calls the OpenAI Responses API with `store: false`; the API key
+never enters client JavaScript.
+
 ## Reliability and privacy
 
 - External requests use timeouts, schema checks, and exponential retry.
 - Database uniqueness/indexes protect coordinates and common access patterns.
 - Uploads are limited to 10 MB and JPEG/PNG/WebP, decoded before persistence, and never listed publicly.
+- Public AI requests accept only JPEG/PNG/WebP data, are resized client-side, rate-limited server-side, and are not retained by Afterglow.
 - RQ refresh jobs use Redis locks so retries are idempotent for a location.
 - API responses include request IDs and response-time headers; logs are structured JSON.
 - In production, use private S3 buckets, SSE-S3 or KMS encryption, lifecycle retention, and presigned access.

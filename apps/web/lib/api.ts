@@ -1,4 +1,4 @@
-import type { Evaluation, Forecast, Location, WeeklyForecast } from "./types";
+import type { AiSkyReading, Evaluation, Forecast, Location, WeeklyForecast } from "./types";
 import type { Locale } from "@/components/locale-provider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -46,6 +46,47 @@ export function uploadObservation(predictionId: string, photo: File): Promise<Ev
   body.set("prediction_id", predictionId);
   body.set("photo", photo);
   return request("/api/v1/observations", { method: "POST", body });
+}
+
+async function imageDataUrl(photo: File): Promise<string> {
+  if (photo.size > 10 * 1024 * 1024) throw new Error("Image exceeds the 10 MB upload limit.");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(photo.type)) throw new Error("Upload a JPEG, PNG, or WebP image.");
+  const bitmap = await createImageBitmap(photo);
+  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This browser could not read the image.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", 0.84);
+}
+
+export async function analyzeSunsetWithAI(forecast: Forecast, photo: File, locale: Locale): Promise<AiSkyReading> {
+  const image_data_url = await imageDataUrl(photo);
+  const response = await fetch("/api/ai/analyze", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      image_data_url,
+      locale,
+      forecast: {
+        date: forecast.date,
+        location: [forecast.location.name, forecast.location.region, forecast.location.country].filter(Boolean).join(", "),
+        sunset: forecast.sunset_display,
+        palette: forecast.palette,
+        dominant_colors: forecast.dominant_colors,
+        vibrancy: forecast.vibrancy,
+        confidence: forecast.confidence,
+        summary: forecast.summary,
+        atmosphere: forecast.atmosphere,
+      },
+    }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message ?? "The AI sky reading is temporarily unavailable.");
+  return payload as AiSkyReading;
 }
 
 const PALETTES = {

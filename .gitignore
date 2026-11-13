@@ -12,6 +12,8 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+dist/
+apps/web/out/
 data/uploads/*
 !data/uploads/.gitkeep
 ml/artifacts/

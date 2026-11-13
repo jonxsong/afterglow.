@@ -54,3 +54,14 @@ export type Evaluation = {
   privacy_note: string;
 };
 
+export type AiSkyReading = {
+  title: string;
+  observed_mood: string;
+  color_story: string;
+  atmosphere_story: string;
+  forecast_match: string;
+  photography_tip: string;
+  confidence_note: string;
+  match_score: number;
+};
+

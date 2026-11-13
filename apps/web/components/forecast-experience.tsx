@@ -4,8 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Camera, Check, Cloud, Droplets, Eye, Sparkles, Upload } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getWeeklyForecast, rememberForecastPalette, uploadObservation } from "@/lib/api";
-import type { Evaluation, Location } from "@/lib/types";
+import { analyzeSunsetWithAI, getWeeklyForecast, rememberForecastPalette, uploadObservation } from "@/lib/api";
+import type { AiSkyReading, Evaluation, Location } from "@/lib/types";
 import { LocationSearch } from "./location-search";
 import { type CopyKey, type Locale, useLocale } from "./locale-provider";
 import { SkyVisualization } from "./sky-visualization";
@@ -71,6 +71,8 @@ export function ForecastExperience() {
   const [location, setLocation] = useState<Location>(DEFAULT_LOCATION);
   const [recent, setRecent] = useState<Location[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [aiReading, setAiReading] = useState<AiSkyReading | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("afterglow:recent");
@@ -82,6 +84,8 @@ export function ForecastExperience() {
   function selectLocation(next: Location) {
     setLocation(next);
     setEvaluation(null);
+    setSelectedPhoto(null);
+    setAiReading(null);
     const updated = [next, ...recent.filter((item) => item.latitude !== next.latitude || item.longitude !== next.longitude)].slice(0, 5);
     setRecent(updated);
     window.localStorage.setItem("afterglow:recent", JSON.stringify(updated));
@@ -96,6 +100,13 @@ export function ForecastExperience() {
     onSuccess: setEvaluation,
   });
   const tonight = forecast.data?.days[0];
+  const aiAnalysis = useMutation({
+    mutationFn: ({ photo }: { photo: File }) => {
+      if (!tonight) throw new Error("The forecast is not ready yet.");
+      return analyzeSunsetWithAI(tonight, photo, locale);
+    },
+    onSuccess: setAiReading,
+  });
 
   useEffect(() => {
     if (tonight) rememberForecastPalette(tonight.prediction_id, tonight.palette);
@@ -176,7 +187,12 @@ export function ForecastExperience() {
               <label className={`upload-card ${upload.isPending ? "uploading" : ""}`}>
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (file) upload.mutate({ predictionId: tonight.prediction_id, file });
+                  if (file) {
+                    setSelectedPhoto(file);
+                    setAiReading(null);
+                    aiAnalysis.reset();
+                    upload.mutate({ predictionId: tonight.prediction_id, file });
+                  }
                 }} />
                 {upload.isPending ? <><span className="spinner" /><strong>{t("readingColors")}</strong></> : <><Upload /><strong>{t("choosePhoto")}</strong><span>{t("photoRequirements")}</span></>}
               </label>
@@ -187,6 +203,27 @@ export function ForecastExperience() {
                   <div><small>{t("forecast")}</small><Palette colors={evaluation.forecast_palette} label={t("paletteLabel")} small /></div>
                   <div><small>{t("observed")}</small><Palette colors={evaluation.observed_palette} label={t("paletteLabel")} small /></div>
                 </motion.div>
+              )}
+              {evaluation && selectedPhoto && (
+                <div className="ai-invitation">
+                  <div><span><Sparkles size={15} /> {t("aiEyebrow")}</span><h4>{t("aiTitle")}</h4><p>{t("aiDisclosure")}</p></div>
+                  <button type="button" disabled={aiAnalysis.isPending} onClick={() => aiAnalysis.mutate({ photo: selectedPhoto })}>
+                    {aiAnalysis.isPending ? <><span className="spinner" /> {t("aiReading")}</> : <>{t("aiButton")} <ArrowRight size={16} /></>}
+                  </button>
+                </div>
+              )}
+              {aiAnalysis.error && <p className="ai-error">{t("aiError")}</p>}
+              {aiReading && (
+                <motion.article className="ai-reading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                  <header><div><span>{t("aiPowered")}</span><h4>{aiReading.title}</h4><p>{aiReading.observed_mood}</p></div><div className="ai-match"><strong>{aiReading.match_score}</strong><span>{t("aiMatchScore")}</span></div></header>
+                  <div className="ai-reading-grid">
+                    <section><span>{t("aiColorStory")}</span><p>{aiReading.color_story}</p></section>
+                    <section><span>{t("aiAtmosphereStory")}</span><p>{aiReading.atmosphere_story}</p></section>
+                    <section><span>{t("aiForecastMatch")}</span><p>{aiReading.forecast_match}</p></section>
+                    <section><span>{t("aiPhotoTip")}</span><p>{aiReading.photography_tip}</p></section>
+                  </div>
+                  <footer>{aiReading.confidence_note}</footer>
+                </motion.article>
               )}
             </div>
           </motion.div>

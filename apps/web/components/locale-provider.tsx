@@ -25,7 +25,7 @@ const copy = {
     heuristic: "Heuristic forecast", method: "Based on live weather data and solar geometry—not a photograph or trained-ML claim.",
     weekAhead: "THE WEEK AHEAD", weekTitle: "Seven evenings, at a glance.", weekNote: "Confidence naturally decreases farther into the forecast.",
     tonight: "Tonight", best: "BEST", closeLoop: "CLOSE THE LOOP", verifyTitle: "What did the sky actually do?",
-    verifyBody: "Upload tonight’s sunset and Afterglow will compare its colors with this saved forecast. Your image remains private.",
+    verifyBody: "Upload tonight’s sunset to compare its colors with the forecast. Color comparison runs privately in your browser; an optional AI reading sends a reduced copy only when you choose it.",
     readingColors: "Reading the colors…", choosePhoto: "Choose a sunset photo", photoRequirements: "JPEG, PNG or WebP · 10 MB max",
     comparison: "Forecast comparison", paletteSimilarity: "palette similarity", meanDifference: "Mean color difference", forecast: "FORECAST", observed: "OBSERVED",
     changeLocation: "Change location", chooseLocation: "Choose a location", closeLocation: "Close location search", findSky: "FIND YOUR SKY",
@@ -36,6 +36,9 @@ const copy = {
     paletteLabel: "Palette", scoreLabel: "Vibrancy score", outOf: "out of 100", locationSearchUnavailable: "Location search is temporarily unavailable.",
     forecastUnavailable: "The atmosphere is temporarily out of reach.", moveToExplore: "Move to explore", uploadTooLarge: "Image exceeds the 10 MB upload limit.",
     uploadType: "Upload a JPEG, PNG, or WebP image.", imageUnreadable: "This browser could not read the image.", serviceUnavailable: "Afterglow could not reach the forecast service.",
+    aiEyebrow: "AI SKY READING", aiTitle: "There’s more in this sky.", aiDisclosure: "A reduced copy will be sent to OpenAI for analysis. Afterglow does not store the image.",
+    aiButton: "Read this sky with AI", aiReading: "Reading the atmosphere…", aiError: "The AI sky reading is temporarily unavailable. Please try again.",
+    aiPowered: "AI INTERPRETATION", aiMatchScore: "forecast match", aiColorStory: "COLOR STORY", aiAtmosphereStory: "ATMOSPHERE", aiForecastMatch: "FORECAST VS. REALITY", aiPhotoTip: "FOR YOUR NEXT SHOT",
   },
   zh: {
     home: "Afterglow 首页", navigation: "主导航", explore: "探索", about: "关于", openMenu: "打开菜单",
@@ -57,7 +60,7 @@ const copy = {
     heuristic: "启发式预报", method: "基于实时天气数据与太阳几何关系，并非照片或训练型机器学习结论。",
     weekAhead: "未来一周", weekTitle: "七个傍晚，一眼看尽。", weekNote: "日期越远，预报可信度会自然降低。",
     tonight: "今晚", best: "最佳", closeLoop: "让预报形成闭环", verifyTitle: "今晚的天空，究竟如何？",
-    verifyBody: "上传今晚的晚霞照片，Afterglow 会将其色彩与保存的预报进行比较。照片始终保持私密。",
+    verifyBody: "上传今晚的晚霞照片，与预报色彩进行比较。色彩对比完全在浏览器内完成；只有在你主动选择 AI 解读时，才会发送缩小后的图片副本。",
     readingColors: "正在读取色彩…", choosePhoto: "选择晚霞照片", photoRequirements: "JPEG、PNG 或 WebP · 最大 10 MB",
     comparison: "预报对比", paletteSimilarity: "色盘相似度", meanDifference: "平均色差", forecast: "预报", observed: "实景",
     changeLocation: "更改地点", chooseLocation: "选择地点", closeLocation: "关闭地点搜索", findSky: "寻找你的天空",
@@ -68,6 +71,9 @@ const copy = {
     paletteLabel: "色盘", scoreLabel: "绚丽指数", outOf: "满分 100", locationSearchUnavailable: "地点搜索暂时不可用。",
     forecastUnavailable: "暂时无法获取大气数据。", moveToExplore: "移动光标，探索天空", uploadTooLarge: "图片超过 10 MB 上传限制。",
     uploadType: "请上传 JPEG、PNG 或 WebP 图片。", imageUnreadable: "此浏览器无法读取这张图片。", serviceUnavailable: "Afterglow 暂时无法连接预报服务。",
+    aiEyebrow: "AI 天空解读", aiTitle: "这片天空，还有更多故事。", aiDisclosure: "缩小后的图片副本将发送至 OpenAI 进行分析。Afterglow 不会存储图片。",
+    aiButton: "让 AI 解读这片天空", aiReading: "正在解读大气…", aiError: "AI 天空解读暂时不可用，请稍后重试。",
+    aiPowered: "AI 解读", aiMatchScore: "预报吻合度", aiColorStory: "色彩故事", aiAtmosphereStory: "大气解读", aiForecastMatch: "预报与实景", aiPhotoTip: "下次拍摄建议",
   },
 } as const;
 

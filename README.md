@@ -39,15 +39,16 @@ For any supported location, Afterglow presents:
 - the best local-time viewing window;
 - cloud-layer, humidity, precipitation, and visibility context;
 - a seven-evening outlook with the strongest sunset highlighted; and
-- private photo verification using perceptual color comparison.
+- private in-browser photo verification using perceptual color comparison; and
+- an optional OpenAI vision reading with a color story, atmospheric interpretation, forecast match, and photography tip.
 
 The sunset visualization is explicitly an **interpretation of forecast conditions**, not a fabricated photograph of the future.
 
 ## Experience
 
-| Tonight | The week ahead | Close the loop |
+| Tonight | The week ahead | Close the loop + AI |
 | --- | --- | --- |
-| Live local sunset time, palette, vibrancy, confidence, and a natural-language reading. | Seven comparable evenings with uncertainty that grows with forecast horizon. | Upload the real sunset, extract its dominant colors, and compare it with the immutable forecast snapshot. |
+| Live local sunset time, palette, vibrancy, confidence, and a natural-language reading. | Seven comparable evenings with uncertainty that grows with forecast horizon. | Compare colors privately, then optionally ask AI to interpret the photographed sky against the forecast. |
 
 The interface is mobile-first, keyboard accessible, reduced-motion aware, and intentionally unlike a conventional weather dashboard.
 
@@ -66,6 +67,7 @@ Afterglow is a **modular monolith**: one product, clean internal boundaries, no 
 | Layer | Responsibilities |
 | --- | --- |
 | **Next.js web** | Editorial UI, location search, query lifecycle, deterministic sky visualization, responsive interactions |
+| **Hosted site worker** | Static asset delivery, protected OpenAI Responses API proxy, validation, rate limiting |
 | **FastAPI application** | Validation, forecast orchestration, immutable snapshots, uploads, evaluations, OpenAPI |
 | **Forecast domain** | Solar position, sunset windows, atmospheric feature engineering, palettes, vibrancy, confidence |
 | **Data layer** | PostgreSQL records, Redis cache and RQ jobs, local/S3-compatible private image storage |
@@ -99,13 +101,16 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 | Next.js 15, React 19, TypeScript | Python 3.12, FastAPI, Pydantic | Docker and Docker Compose |
 | TanStack Query, Motion, Tailwind CSS | SQLAlchemy, Alembic, PostgreSQL | AWS ECS Fargate starter |
 | Accessible responsive components | Redis, RQ, Pillow, scikit-learn | Terraform and GitHub Actions |
-| Deterministic CSS sky renderer | Open-Meteo weather and geocoding | Public `.chatgpt.site` frontend |
+| Deterministic CSS sky renderer | Open-Meteo weather and geocoding | Public `.chatgpt.site` worker deployment |
+| Bilingual English/Chinese experience | OpenAI vision sky interpretation | Server-side secrets and request throttling |
 
 ## Repository map
 
 ```text
 afterglow/
 ├── apps/web/                  # Next.js App Router experience
+├── services/site-worker/      # Public Site runtime + protected AI endpoint
+├── scripts/                   # Site build, preview, and AI smoke checks
 ├── services/api/              # FastAPI modular monolith + migrations
 ├── services/worker/           # Redis/RQ background jobs
 ├── ml/
@@ -172,8 +177,10 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `S3_ENDPOINT_URL` | Optional compatible endpoint | unset |
 | `OPEN_METEO_TIMEOUT_SECONDS` | Upstream request timeout | `10` |
 | `ALLOWED_ORIGINS` | CORS allowlist | `http://localhost:3000` |
+| `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
+| `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-Open-Meteo requires no API key. Never commit production credentials; use AWS Secrets Manager or your platform’s equivalent.
+Open-Meteo requires no API key. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret.
 
 ## API surface
 
@@ -184,6 +191,7 @@ GET  /api/v1/forecast/weekly
 GET  /api/v1/forecast/{prediction_id}
 POST /api/v1/observations
 GET  /api/v1/evaluations/{prediction_id}
+POST /api/ai/analyze
 GET  /health
 GET  /ready
 ```
@@ -199,6 +207,7 @@ pytest
 # Frontend component tests and production build
 pnpm --dir apps/web test
 pnpm --dir apps/web build
+pnpm test:worker
 
 # Browser and load checks
 pnpm --dir apps/web test:e2e
@@ -226,7 +235,8 @@ See the complete [evaluation contract](./ml/evaluation/README.md).
 - Ordinary weather forecasts do not fully observe aerosols, smoke layers, terrain obstruction, or localized marine layers.
 - Camera exposure, white balance, HDR, editing, crop, and foreground pixels affect observed-color evaluation.
 - The current CIE76 nearest-palette comparison is product feedback, not a scientific accuracy claim.
-- The public static deployment performs the forecast directly against Open-Meteo; the full local/AWS architecture adds durable snapshots, queues, caching, and object storage.
+- The public deployment performs the forecast directly against Open-Meteo and uses a small server worker for optional AI analysis; the full local/AWS architecture adds durable snapshots, queues, caching, and object storage.
+- AI sky readings are visual interpretations, not measurements of aerosols, pollution, or safety-critical weather conditions.
 
 ## Roadmap
 
