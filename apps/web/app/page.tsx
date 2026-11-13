@@ -32,7 +32,7 @@ export default function Home() {
           <a className="primary-cta" href="#forecast">{t("heroCta")} <ArrowDown size={17} /></a>
         </div>
         <div className="hero-art">
-          <SkyVisualization palette={heroPalette} cloudCover={46} interpretationLabel={t("forecastInterpretation")} />
+          <SkyVisualization palette={heroPalette} cloudCover={46} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
           <p><span>{t("tonightPalette")}</span><b>{t("heroColors")}</b></p>
         </div>
         <div className="hero-index">35.7° N<br />{t("california")}</div>

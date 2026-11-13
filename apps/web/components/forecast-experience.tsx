@@ -130,7 +130,7 @@ export function ForecastExperience() {
 
             <div className="forecast-card">
               <div className="forecast-visual">
-                <SkyVisualization palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} interpretationLabel={t("forecastInterpretation")} />
+                <SkyVisualization palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
               </div>
               <div className="forecast-details">
                 <div className="sunset-time"><span>{t("sunset")}</span><strong>{tonight.sunset_display}</strong></div>

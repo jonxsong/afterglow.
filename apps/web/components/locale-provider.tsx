@@ -34,7 +34,7 @@ const copy = {
     permissionDenied: "Permission was not granted. You can still search for a city.", currentLocationName: "Current location",
     searchingMap: "Looking across the map…", recent: "RECENT", forecastInterpretation: "Forecast interpretation",
     paletteLabel: "Palette", scoreLabel: "Vibrancy score", outOf: "out of 100", locationSearchUnavailable: "Location search is temporarily unavailable.",
-    forecastUnavailable: "The atmosphere is temporarily out of reach.", uploadTooLarge: "Image exceeds the 10 MB upload limit.",
+    forecastUnavailable: "The atmosphere is temporarily out of reach.", moveToExplore: "Move to explore", uploadTooLarge: "Image exceeds the 10 MB upload limit.",
     uploadType: "Upload a JPEG, PNG, or WebP image.", imageUnreadable: "This browser could not read the image.", serviceUnavailable: "Afterglow could not reach the forecast service.",
   },
   zh: {
@@ -66,7 +66,7 @@ const copy = {
     permissionDenied: "未获得定位权限，你仍可搜索城市。", currentLocationName: "当前位置",
     searchingMap: "正在搜索地图…", recent: "最近使用", forecastInterpretation: "晚霞预报示意图",
     paletteLabel: "色盘", scoreLabel: "绚丽指数", outOf: "满分 100", locationSearchUnavailable: "地点搜索暂时不可用。",
-    forecastUnavailable: "暂时无法获取大气数据。", uploadTooLarge: "图片超过 10 MB 上传限制。",
+    forecastUnavailable: "暂时无法获取大气数据。", moveToExplore: "移动光标，探索天空", uploadTooLarge: "图片超过 10 MB 上传限制。",
     uploadType: "请上传 JPEG、PNG 或 WebP 图片。", imageUnreadable: "此浏览器无法读取这张图片。", serviceUnavailable: "Afterglow 暂时无法连接预报服务。",
   },
 } as const;
