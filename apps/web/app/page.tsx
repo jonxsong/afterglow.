@@ -1,4 +1,5 @@
 import { ArrowDown, Menu } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { ForecastExperience } from "@/components/forecast-experience";
 import { SkyVisualization } from "@/components/sky-visualization";
 
@@ -8,7 +9,7 @@ export default function Home() {
   return (
     <main>
       <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="Afterglow home">afterglow<span>.</span></a>
+        <a href="#top" aria-label="Afterglow home"><BrandLogo /></a>
         <nav aria-label="Main navigation"><a href="#explore">Explore</a><a href="#about">About</a></nav>
         <details className="mobile-menu">
           <summary aria-label="Open menu"><Menu /></summary>
@@ -45,7 +46,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer><a className="wordmark" href="#top">afterglow<span>.</span></a><p>Chase the beautiful.</p><small>Forecasts are atmospheric interpretations, not safety-critical weather advice.</small></footer>
+      <footer><a href="#top" aria-label="Afterglow home"><BrandLogo /></a><p>Chase the beautiful.</p><small>Forecasts are atmospheric interpretations, not safety-critical weather advice.</small></footer>
     </main>
   );
 }
