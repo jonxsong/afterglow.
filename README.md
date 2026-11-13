@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./apps/web/app/icon.svg" alt="Afterglow sunset logo" width="96" height="96" />
+
 # afterglow.
 
 ### Chase the beautiful.
