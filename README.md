@@ -7,12 +7,13 @@
 ### Chase the beautiful.
 
 **Sunset intelligence for people who appreciate beautiful skies.**<br />
-Afterglow turns live atmospheric forecasts and solar geometry into a calm, colorful answer to one question: *is tonight worth stepping outside for?*
+Afterglow predicts the evening palette from live atmospheric data, then lets the real sky answer back through private color comparison and an optional AI interpretation.
 
 [![Live Site](https://img.shields.io/badge/Live-afterglow.chatgpt.site-24211F?style=for-the-badge&logo=cloudflare&logoColor=F2B28D)](https://afterglow-sky-forecast.perkyaisle4.chatgpt.site/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-24211F?style=for-the-badge&logo=nextdotjs&logoColor=white)](./apps/web)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-625B57?style=for-the-badge&logo=fastapi&logoColor=white)](./services/api)
-[![Tests](https://img.shields.io/badge/tests-13_passing-8D83BA?style=for-the-badge&logo=pytest&logoColor=white)](#quality)
+[![OpenAI](https://img.shields.io/badge/OpenAI-vision_readings-8D83BA?style=for-the-badge&logo=openai&logoColor=white)](#ai-sky-readings)
+[![Tests](https://img.shields.io/badge/tests-passing-657D69?style=for-the-badge&logo=pytest&logoColor=white)](#quality)
 
 [**Open Afterglow ↗**](https://afterglow-sky-forecast.perkyaisle4.chatgpt.site/) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
 
@@ -44,6 +45,19 @@ For any supported location, Afterglow presents:
 
 The sunset visualization is explicitly an **interpretation of forecast conditions**, not a fabricated photograph of the future.
 
+## AI sky readings
+
+Afterglow's forecast itself remains a transparent atmospheric heuristic. AI enters only
+after a visitor uploads a real sunset and explicitly selects **Read this sky with AI**.
+The vision reading describes the visible palette and mood, offers a cautious atmospheric
+interpretation, compares the photograph with the forecast, suggests a photography technique,
+and returns a visual match score.
+
+The initial palette comparison never leaves the browser. For an AI reading, the browser
+resizes the selected image before sending it to the Site worker. The OpenAI credential stays
+server-side, requests are throttled, Afterglow does not persist the image, and the upstream
+request uses `store: false`.
+
 ## Experience
 
 | Tonight | The week ahead | Close the loop + AI |
@@ -62,7 +76,11 @@ The interface is mobile-first, keyboard accessible, reduced-motion aware, and in
   <sub>Click the diagram for a full-size view.</sub>
 </div>
 
-Afterglow is a **modular monolith**: one product, clean internal boundaries, no ceremonial microservices.
+Afterglow has two deliberate delivery profiles. The public product is a compact Next.js +
+Site Worker application: forecast data comes from Open-Meteo, local color comparison stays
+in the browser, and the worker protects the optional OpenAI call. The repository also contains
+a fuller FastAPI modular monolith for durable snapshots, queues, private object storage, and
+self-hosted or AWS deployments.
 
 | Layer | Responsibilities |
 | --- | --- |
@@ -180,7 +198,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
 | `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-Open-Meteo requires no API key. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret.
+Open-Meteo requires no API key. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret. Each requested AI reading consumes OpenAI API usage; the ordinary forecast and browser-only color comparison do not.
 
 ## API surface
 

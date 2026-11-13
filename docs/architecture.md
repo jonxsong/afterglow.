@@ -1,11 +1,16 @@
 # Architecture
 
-Afterglow is a modular monolith. The browser uses a single Next.js application;
-FastAPI owns location lookup, forecast generation, immutable prediction snapshots,
-photo validation, and evaluation. PostgreSQL is the system of record, Redis backs
-RQ jobs, forecast caching, and refresh locks, and uploaded photos use a storage
-adapter that maps to a local volume in development and private S3-compatible storage
-when `S3_BUCKET` is configured.
+Afterglow has two delivery profiles around the same forecast concepts. The public Site
+uses a statically exported Next.js application and a lightweight server worker. The browser
+fetches Open-Meteo data, computes the heuristic forecast, renders the interactive sky, and
+performs the first photo color comparison locally. The worker serves the application and
+protects the optional OpenAI vision endpoint.
+
+The full self-hosted profile is a FastAPI modular monolith. FastAPI owns location lookup,
+forecast generation, immutable prediction snapshots, photo validation, and evaluation.
+PostgreSQL is the system of record, Redis backs RQ jobs, forecast caching, and refresh locks,
+and uploaded photos use a storage adapter that maps to a local volume in development and
+private S3-compatible storage when `S3_BUCKET` is configured.
 
 ## Forecast flow
 
