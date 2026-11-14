@@ -119,7 +119,7 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 | Next.js 15, React 19, TypeScript | Python 3.12, FastAPI, Pydantic | Docker and Docker Compose |
 | TanStack Query, Motion, Tailwind CSS | SQLAlchemy, Alembic, PostgreSQL | AWS ECS Fargate starter |
 | Accessible responsive components | Redis, RQ, Pillow, scikit-learn | Terraform and GitHub Actions |
-| Deterministic CSS sky renderer | Open-Meteo weather and geocoding | Public `.chatgpt.site` worker deployment |
+| Deterministic CSS sky renderer | Open-Meteo weather and geocoding | Public `afterglow.jonzhang.dev` worker deployment |
 | Bilingual English/Chinese experience | OpenAI vision sky interpretation | Server-side secrets and request throttling |
 
 ## Repository map
