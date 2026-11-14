@@ -9,13 +9,13 @@
 **Sunset intelligence for people who appreciate beautiful skies.**<br />
 Afterglow predicts the evening palette from live atmospheric data, then lets the real sky answer back through private color comparison and an optional AI interpretation.
 
-[![Live Site](https://img.shields.io/badge/Live-afterglow.chatgpt.site-24211F?style=for-the-badge&logo=cloudflare&logoColor=F2B28D)](https://afterglow-sky-forecast.perkyaisle4.chatgpt.site/)
+[![Live Site](https://img.shields.io/badge/Live-afterglow.jonzhang.dev-24211F?style=for-the-badge&logo=cloudflare&logoColor=F2B28D)](https://afterglow.jonzhang.dev/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-24211F?style=for-the-badge&logo=nextdotjs&logoColor=white)](./apps/web)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-625B57?style=for-the-badge&logo=fastapi&logoColor=white)](./services/api)
 [![OpenAI](https://img.shields.io/badge/OpenAI-vision_readings-8D83BA?style=for-the-badge&logo=openai&logoColor=white)](#ai-sky-readings)
 [![Tests](https://img.shields.io/badge/tests-passing-657D69?style=for-the-badge&logo=pytest&logoColor=white)](#quality)
 
-[**Open Afterglow ↗**](https://afterglow-sky-forecast.perkyaisle4.chatgpt.site/) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
+[**Open Afterglow ↗**](https://afterglow.jonzhang.dev/) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
 
 <br />
 
@@ -187,6 +187,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | Variable | Purpose | Local default |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Browser-facing FastAPI origin | `http://localhost:8000` |
+| `NEXT_PUBLIC_SITE_URL` | Canonical production origin | `https://afterglow.jonzhang.dev` |
 | `DATABASE_URL` | SQLAlchemy connection | SQLite natively; PostgreSQL in Compose |
 | `REDIS_URL` | Cache, locks, and RQ | `redis://localhost:6379/0` |
 | `UPLOAD_DIRECTORY` | Development photo storage | `data/uploads` |
@@ -266,7 +267,7 @@ See the complete [evaluation contract](./ml/evaluation/README.md).
 
 ## Deployment
 
-- **Public preview:** [afterglow-sky-forecast.perkyaisle4.chatgpt.site](https://afterglow-sky-forecast.perkyaisle4.chatgpt.site/)
+- **Production:** [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev/)
 - **Local:** Docker Compose or native processes
 - **AWS-ready:** ECS Fargate, RDS PostgreSQL, ElastiCache Redis, private S3, ECR, CloudWatch, and Terraform
 

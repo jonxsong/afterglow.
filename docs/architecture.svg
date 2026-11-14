@@ -128,7 +128,7 @@
 
   <path d="M74 728 C160 701, 270 715, 361 696" fill="none" stroke="#8d83ba" stroke-width="3" filter="url(#rough)"/>
   <text x="72" y="765" class="group">DELIVERY</text>
-  <text x="72" y="798" class="body">Public: .chatgpt.site Worker</text>
+  <text x="72" y="798" class="body">Public: afterglow.jonzhang.dev</text>
   <text x="72" y="825" class="body">Local: Next.js + FastAPI</text>
   <text x="72" y="852" class="body">Cloud: ECS · RDS · Redis · S3</text>
   <text x="72" y="890" class="tiny">Forecast ≠ safety-critical weather advice</text>

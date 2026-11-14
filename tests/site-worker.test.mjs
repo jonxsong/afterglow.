@@ -12,6 +12,12 @@ test("serves embedded static assets", async () => {
   assert.equal(await response.text(), "<h1>Afterglow</h1>");
 });
 
+test("reports public worker health", async () => {
+  const response = await createWorker().fetch(new Request("https://afterglow.test/health"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "ok", service: "afterglow" });
+});
+
 test("keeps AI unavailable without a server-side key", async () => {
   const worker = createWorker();
   const response = await worker.fetch(new Request("https://afterglow.test/api/ai/analyze", { method: "POST", body: JSON.stringify({ image_data_url: image, forecast }) }));

@@ -28,7 +28,7 @@ dataset exists and a leakage-safe evaluation shows improvement.
 
 ## Public Site and AI reading
 
-The public `.chatgpt.site` build keeps forecasting deterministic and fetches Open-Meteo
+The public `afterglow.jonzhang.dev` build keeps forecasting deterministic and fetches Open-Meteo
 directly. A lightweight Site worker serves the exported Next.js assets and exposes one
 protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
 comparison locally. Only after the visitor explicitly requests an AI reading does it resize

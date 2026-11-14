@@ -166,6 +166,7 @@ export function createWorker(assets = {}) {
   return {
     async fetch(request, env = {}) {
       const pathname = new URL(request.url).pathname;
+      if (pathname === "/health") return json({ status: "ok", service: "afterglow" });
       if (pathname === "/api/ai/analyze") return analyze(request, env);
       if (request.method !== "GET" && request.method !== "HEAD") return errorResponse("Method not allowed.", 405);
       return serveAsset(request);
