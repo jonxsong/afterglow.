@@ -18,6 +18,43 @@ test("reports public worker health", async () => {
   assert.deepEqual(await response.json(), { status: "ok", service: "afterglow" });
 });
 
+test("proxies and caches Open-Meteo forecast requests", async () => {
+  const originalFetch = globalThis.fetch;
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return new Response(JSON.stringify({ daily: { sunset: ["2026-11-14T16:58"] }, hourly: { time: [] } }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
+  try {
+    const response = await createWorker().fetch(new Request("https://afterglow.test/api/weather/forecast?latitude=37.7749&longitude=-122.4194"));
+    assert.equal(response.status, 200);
+    assert.equal(captured.url, "https://api.open-meteo.com/v1/forecast?latitude=37.7749&longitude=-122.4194");
+    assert.equal(captured.init.cf.cacheTtl, 300);
+    assert.match(response.headers.get("cache-control"), /max-age=300/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("retries transient weather failures", async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = async () => {
+    attempts += 1;
+    if (attempts < 3) return new Response("unavailable", { status: 503 });
+    return new Response(JSON.stringify({ results: [] }), { headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await createWorker().fetch(new Request("https://afterglow.test/api/weather/geocoding?name=San%20Francisco"));
+    assert.equal(response.status, 200);
+    assert.equal(attempts, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("keeps AI unavailable without a server-side key", async () => {
   const worker = createWorker();
   const response = await worker.fetch(new Request("https://afterglow.test/api/ai/analyze", { method: "POST", body: JSON.stringify({ image_data_url: image, forecast }) }));

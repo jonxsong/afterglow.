@@ -187,6 +187,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | Variable | Purpose | Local default |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Browser-facing FastAPI origin | `http://localhost:8000` |
+| `NEXT_PUBLIC_WEATHER_PROXY` | Same-origin weather proxy used by the hosted Site | unset (direct locally) |
 | `NEXT_PUBLIC_SITE_URL` | Canonical production origin | `https://afterglow.jonzhang.dev` |
 | `DATABASE_URL` | SQLAlchemy connection | SQLite natively; PostgreSQL in Compose |
 | `REDIS_URL` | Cache, locks, and RQ | `redis://localhost:6379/0` |
@@ -199,7 +200,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
 | `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-Open-Meteo requires no API key. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret. Each requested AI reading consumes OpenAI API usage; the ordinary forecast and browser-only color comparison do not.
+Open-Meteo requires no API key. The hosted build routes weather requests through the Site worker for bounded retries and short-lived caching; local development can continue to call Open-Meteo directly. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret. Each requested AI reading consumes OpenAI API usage; the ordinary forecast and browser-only color comparison do not.
 
 ## API surface
 

@@ -64,8 +64,8 @@
   <rect x="422" y="189" width="400" height="212" rx="24" class="echo"/>
   <text x="454" y="229" class="label">Public Site worker</text>
   <text x="454" y="263" class="body">serves the exported Next.js application</text>
-  <text x="454" y="290" class="body">POST /api/ai/analyze</text>
-  <text x="454" y="317" class="body">image validation · request throttling</text>
+  <text x="454" y="290" class="body">GET /api/weather/* · POST /api/ai/analyze</text>
+  <text x="454" y="317" class="body">weather retry/cache · AI throttling</text>
   <rect x="454" y="340" width="328" height="41" rx="12" fill="#f8f4ff" stroke="#796d91" stroke-width="1.4"/>
   <text x="472" y="365" class="tiny">🔒 OPENAI_API_KEY stays server-side</text>
 

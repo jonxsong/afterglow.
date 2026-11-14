@@ -1,6 +1,10 @@
 const TEN_MINUTES = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_BODY_BYTES = 6 * 1024 * 1024;
+const WEATHER_UPSTREAMS = {
+  "/api/weather/forecast": { url: "https://api.open-meteo.com/v1/forecast", cacheSeconds: 300 },
+  "/api/weather/geocoding": { url: "https://geocoding-api.open-meteo.com/v1/search", cacheSeconds: 86400 },
+};
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -94,6 +98,40 @@ function safeForecast(value) {
 export function createWorker(assets = {}) {
   const rateLimits = new Map();
 
+  async function proxyWeather(request, pathname) {
+    if (request.method !== "GET") return errorResponse("Method not allowed.", 405, { allow: "GET" });
+    const upstream = WEATHER_UPSTREAMS[pathname];
+    const requestUrl = new URL(request.url);
+    const upstreamUrl = `${upstream.url}?${requestUrl.searchParams}`;
+    let lastStatus = 503;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(upstreamUrl, {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+          cf: { cacheEverything: true, cacheTtl: upstream.cacheSeconds },
+        });
+        lastStatus = response.status;
+        if (response.ok || (response.status < 500 && response.status !== 429)) {
+          return new Response(response.body, {
+            status: response.status,
+            headers: {
+              "content-type": response.headers.get("content-type") || "application/json; charset=utf-8",
+              "cache-control": `public, max-age=${upstream.cacheSeconds}, stale-while-revalidate=${upstream.cacheSeconds * 6}`,
+              "x-content-type-options": "nosniff",
+            },
+          });
+        }
+        await response.body?.cancel();
+      } catch {
+        lastStatus = 503;
+      }
+    }
+
+    return errorResponse("The atmosphere is temporarily out of reach.", lastStatus === 429 ? 429 : 503, { "retry-after": "30" });
+  }
+
   async function analyze(request, env) {
     if (request.method !== "POST") return errorResponse("Method not allowed.", 405, { allow: "POST" });
     if (!env?.OPENAI_API_KEY) return errorResponse("AI sky readings are not configured.", 503);
@@ -168,6 +206,7 @@ export function createWorker(assets = {}) {
       const pathname = new URL(request.url).pathname;
       if (pathname === "/health") return json({ status: "ok", service: "afterglow" });
       if (pathname === "/api/ai/analyze") return analyze(request, env);
+      if (WEATHER_UPSTREAMS[pathname]) return proxyWeather(request, pathname);
       if (request.method !== "GET" && request.method !== "HEAD") return errorResponse("Method not allowed.", 405);
       return serveAsset(request);
     },

@@ -1,8 +1,8 @@
 # Architecture
 
 Afterglow has two delivery profiles around the same forecast concepts. The public Site
-uses a statically exported Next.js application and a lightweight server worker. The browser
-fetches Open-Meteo data, computes the heuristic forecast, renders the interactive sky, and
+uses a statically exported Next.js application and a lightweight server worker. The worker
+proxies and briefly caches Open-Meteo data; the browser computes the heuristic forecast, renders the interactive sky, and
 performs the first photo color comparison locally. The worker serves the application and
 protects the optional OpenAI vision endpoint.
 
@@ -29,8 +29,8 @@ dataset exists and a leakage-safe evaluation shows improvement.
 ## Public Site and AI reading
 
 The public `afterglow.jonzhang.dev` build keeps forecasting deterministic and fetches Open-Meteo
-directly. A lightweight Site worker serves the exported Next.js assets and exposes one
-protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
+through retrying, same-origin worker routes. The Site worker serves the exported Next.js assets,
+briefly caches weather responses, and exposes the protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
 comparison locally. Only after the visitor explicitly requests an AI reading does it resize
 the photograph and send that copy to the worker. The worker validates the payload, applies
 per-client throttling, and calls the OpenAI Responses API with `store: false`; the API key
