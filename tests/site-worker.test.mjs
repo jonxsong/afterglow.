@@ -31,7 +31,7 @@ test("proxies and caches Open-Meteo forecast requests", async () => {
     const response = await createWorker().fetch(new Request("https://afterglow.test/api/weather/forecast?latitude=37.7749&longitude=-122.4194"));
     assert.equal(response.status, 200);
     assert.equal(captured.url, "https://api.open-meteo.com/v1/forecast?latitude=37.7749&longitude=-122.4194");
-    assert.equal(captured.init.cf.cacheTtl, 300);
+    assert.equal(captured.init.headers.accept, "application/json");
     assert.match(response.headers.get("cache-control"), /max-age=300/);
   } finally {
     globalThis.fetch = originalFetch;

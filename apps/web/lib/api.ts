@@ -4,6 +4,22 @@ import type { Locale } from "@/components/locale-provider";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const WEATHER_PROXY = (process.env.NEXT_PUBLIC_WEATHER_PROXY || "").replace(/\/+$/, "");
 
+async function fetchWeather(proxyPath: string, directUrl: string): Promise<Response> {
+  const endpoints = WEATHER_PROXY ? [`${WEATHER_PROXY}${proxyPath}`, directUrl, directUrl] : [directUrl, directUrl];
+  let lastResponse: Response | null = null;
+  for (const endpoint of endpoints) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const response = await fetch(endpoint, { signal: controller.signal });
+      if (response.ok || (response.status < 500 && response.status !== 429)) return response;
+      lastResponse = response;
+    } catch { /* try the same-origin proxy or direct provider fallback */ }
+    finally { clearTimeout(timeout); }
+  }
+  return lastResponse ?? new Response(null, { status: 503 });
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, init);
   if (!response.ok) {
@@ -104,8 +120,7 @@ type OpenMeteoPayload = {
 
 async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<Location[]> {
   const params = new URLSearchParams({ name: query, count: "8", language: locale, format: "json" });
-  const endpoint = WEATHER_PROXY ? `${WEATHER_PROXY}/geocoding?${params}` : `https://geocoding-api.open-meteo.com/v1/search?${params}`;
-  const response = await fetch(endpoint);
+  const response = await fetchWeather(`/geocoding?${params}`, `https://geocoding-api.open-meteo.com/v1/search?${params}`);
   if (!response.ok) throw new Error("Location search is temporarily unavailable.");
   const payload = await response.json();
   return (payload.results ?? []).filter((item: Record<string, unknown>) => item.name && item.country && item.timezone).map((item: Record<string, unknown>) => ({
@@ -132,8 +147,7 @@ function at<T extends string | number | null>(payload: OpenMeteoPayload, field: 
 async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
   const variables = ["cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "relative_humidity_2m", "visibility", "precipitation_probability"];
   const params = new URLSearchParams({ latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone, forecast_days: "7", hourly: variables.join(","), daily: "sunset" });
-  const endpoint = WEATHER_PROXY ? `${WEATHER_PROXY}/forecast?${params}` : `https://api.open-meteo.com/v1/forecast?${params}`;
-  const response = await fetch(endpoint);
+  const response = await fetchWeather(`/forecast?${params}`, `https://api.open-meteo.com/v1/forecast?${params}`);
   if (!response.ok) throw new Error("The atmosphere is temporarily out of reach.");
   const payload = await response.json() as OpenMeteoPayload;
   const hourlyTimes = payload.hourly.time.map((value) => new Date(String(value)));

@@ -109,8 +109,6 @@ export function createWorker(assets = {}) {
       try {
         const response = await fetch(upstreamUrl, {
           headers: { accept: "application/json" },
-          signal: AbortSignal.timeout(8000),
-          cf: { cacheEverything: true, cacheTtl: upstream.cacheSeconds },
         });
         lastStatus = response.status;
         if (response.ok || (response.status < 500 && response.status !== 429)) {
