@@ -10,12 +10,22 @@ test("home page presents the brand and forecast entry point", async ({ page }) =
 test("plays a live evening and restores a labeled forecast after the weather feed fails", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-11-17T20:00:00Z"));
   const sunset = Date.parse("2026-11-18T00:56:00Z") / 1000;
-  await page.route(/\/forecast\?/, (route) => route.fulfill({ json: {
-    hourly: { time: [sunset], cloud_cover: [45], visibility: [20000] },
-    daily: { sunset: [sunset] },
-  } }));
+  let finishForecast!: () => void;
+  const forecastPending = new Promise<void>((resolve) => { finishForecast = resolve; });
+  await page.route(/\/forecast\?/, async (route) => {
+    await forecastPending;
+    await route.fulfill({ json: {
+      hourly: { time: [sunset], cloud_cover: [45], visibility: [20000] },
+      daily: { sunset: [sunset] },
+    } });
+  });
   await page.goto("/#forecast");
   const slider = page.getByRole("slider", { name: "Explore the evening" });
+  await page.getByRole("button", { name: "Explore a sample sunset" }).click();
+  await expect(page.getByRole("heading", { name: "Explore a sample sunset" })).toBeFocused();
+  await expect(slider).toHaveAttribute("aria-valuetext", "6:45 PM, Sunset");
+  finishForecast();
+  await page.getByRole("button", { name: "Back to tonight’s forecast" }).click();
   await expect(slider).toHaveAttribute("aria-valuetext", "4:56 PM, Sunset");
   await page.getByRole("button", { name: "after sunset", exact: true }).click();
   await expect(slider).toHaveValue("35");

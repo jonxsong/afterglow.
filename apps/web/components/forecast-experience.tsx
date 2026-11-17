@@ -21,6 +21,10 @@ const DEFAULT_LOCATION: Location = {
 
 const EXAMPLE_PALETTE = ["#F7D4AA", "#EEAD7E", "#DA7E7A", "#A66F92", "#665E8B"];
 
+function focusPreviewHeading(element: HTMLHeadingElement | null) {
+  element?.focus({ preventScroll: true });
+}
+
 function formatDay(date: string, index: number, locale: Locale, tonight: string) {
   if (index === 0) return tonight;
   return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { weekday: "short" }).format(new Date(`${date}T12:00:00`));
@@ -75,6 +79,7 @@ export function ForecastExperience() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [aiReading, setAiReading] = useState<AiSkyReading | null>(null);
+  const [showSample, setShowSample] = useState(false);
 
   useEffect(() => {
     try {
@@ -88,6 +93,7 @@ export function ForecastExperience() {
 
   function selectLocation(next: Location) {
     setLocation(next);
+    setShowSample(false);
     setEvaluation(null);
     setSelectedPhoto(null);
     setAiReading(null);
@@ -106,6 +112,8 @@ export function ForecastExperience() {
     onSuccess: setEvaluation,
   });
   const tonight = forecast.data?.days[0];
+  const liveUnavailable = Boolean(forecast.error && !tonight);
+  const previewing = showSample || liveUnavailable;
   const freshness = forecast.data?.freshness;
   const dateLocale = locale === "zh" ? "zh-CN" : "en-US";
   const cachedAt = freshness?.source === "cache" ? new Intl.DateTimeFormat(dateLocale, {
@@ -136,25 +144,37 @@ export function ForecastExperience() {
         <LocationSearch onSelect={selectLocation} recent={recent} />
       </div>
       <AnimatePresence mode="wait">
-        {forecast.isLoading && (
-          <motion.div key="loading" className="forecast-loading" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="loading-sky" /><p>{t("loading")}</p>
+        {forecast.isLoading && !previewing && (
+          <motion.div key="loading" className="forecast-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="loading-sky" aria-hidden /><p role="status">{t("loading")}</p>
+            <button className="sky-play" type="button" onClick={() => setShowSample(true)}>{t("previewTitle")}</button>
           </motion.div>
         )}
-        {forecast.error && !tonight && (
+        {previewing && (
           <motion.div key="unavailable" className="forecast-card forecast-preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="forecast-details forecast-preview-copy">
               <p className="eyebrow">{t("sampleSky")}</p>
-              <h3>{t("previewTitle")}</h3>
-              <p role="status">{t("previewNote")}</p>
-              <button className="forecast-retry" type="button" disabled={forecast.isFetching} onClick={() => forecast.refetch()}>
-                {t(forecast.isFetching ? "loading" : "tryAgain")} <ArrowRight size={16} aria-hidden />
-              </button>
+              <h3 tabIndex={-1} ref={showSample ? focusPreviewHeading : undefined}>{t("previewTitle")}</h3>
+              {liveUnavailable ? (
+                <>
+                  <p role="status">{t("previewNote")}</p>
+                  <button className="forecast-retry" type="button" disabled={forecast.isFetching} onClick={() => {
+                    setShowSample(false);
+                    void forecast.refetch();
+                  }}>
+                    {t(forecast.isFetching ? "loading" : "tryAgain")} <ArrowRight size={16} aria-hidden />
+                  </button>
+                </>
+              ) : (
+                <button className="forecast-retry" type="button" onClick={() => setShowSample(false)}>
+                  {t("backToForecast")} <ArrowRight size={16} aria-hidden />
+                </button>
+              )}
             </div>
             <SkyTimeline palette={EXAMPLE_PALETTE} cloudCover={46} sunsetAt="2000-01-01T18:45:00Z" timezone="UTC" sample />
           </motion.div>
         )}
-        {tonight && (
+        {tonight && !previewing && (
           <motion.div key={tonight.prediction_id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             {cachedAt && <p className="forecast-freshness" role="status">{t("cachedForecast")} <time dateTime={freshness?.fetched_at}>{cachedAt}</time></p>}
 
