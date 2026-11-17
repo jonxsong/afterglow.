@@ -73,6 +73,7 @@ export function ForecastExperience() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [aiReading, setAiReading] = useState<AiSkyReading | null>(null);
+  const [timeOffset, setTimeOffset] = useState(0);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("afterglow:recent");
@@ -83,6 +84,7 @@ export function ForecastExperience() {
 
   function selectLocation(next: Location) {
     setLocation(next);
+    setTimeOffset(0);
     setEvaluation(null);
     setSelectedPhoto(null);
     setAiReading(null);
@@ -100,6 +102,10 @@ export function ForecastExperience() {
     onSuccess: setEvaluation,
   });
   const tonight = forecast.data?.days[0];
+  const sunsetTime = tonight ? new Date(tonight.sunset_at).getTime() : 0;
+  const formatSkyTime = (offset: number) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    hour: "numeric", minute: "2-digit", timeZone: location.timezone,
+  }).format(new Date(sunsetTime + offset * 60_000));
   const aiAnalysis = useMutation({
     mutationFn: ({ photo }: { photo: File }) => {
       if (!tonight) throw new Error("The forecast is not ready yet.");
@@ -141,7 +147,13 @@ export function ForecastExperience() {
 
             <div className="forecast-card">
               <div className="forecast-visual">
-                <SkyVisualization palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
+                <SkyVisualization palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} timeOffsetMinutes={timeOffset} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
+                <div className="sky-timeline">
+                  <div className="sky-timeline-heading"><label htmlFor="sky-time">{t("exploreEvening")}</label><output htmlFor="sky-time">{formatSkyTime(timeOffset)}</output></div>
+                  <input id="sky-time" type="range" min={-90} max={90} step={5} value={timeOffset} onChange={(event) => setTimeOffset(Number(event.target.value))} aria-valuetext={`${formatSkyTime(timeOffset)}, ${timeOffset === 0 ? t("sunset") : timeOffset < 0 ? t("beforeSunset") : t("afterSunset")}`} />
+                  <div className="sky-timeline-marks"><span>{formatSkyTime(-90)}</span><span>{t("sunset")}</span><span>{formatSkyTime(90)}</span></div>
+                  <p>{t("timelineNote")}</p>
+                </div>
               </div>
               <div className="forecast-details">
                 <div className="sunset-time"><span>{t("sunset")}</span><strong>{tonight.sunset_display}</strong></div>

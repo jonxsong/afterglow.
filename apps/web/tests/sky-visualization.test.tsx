@@ -21,5 +21,18 @@ describe("SkyVisualization", () => {
     expect(sky.style.getPropertyValue("--mx")).toBe("1.000");
     expect(sky.style.getPropertyValue("--my")).toBe("0.000");
   });
+
+  it("moves the sun and changes the sky across the sunset timeline", () => {
+    const palette = ["#F8D6AE", "#F4B184", "#E88772", "#B9798D", "#6F6A9B"];
+    const { rerender } = render(<SkyVisualization palette={palette} cloudCover={40} timeOffsetMinutes={-90} />);
+    const sky = screen.getByRole("img");
+    const before = { background: sky.style.background, sun: sky.style.getPropertyValue("--sun-bottom") };
+    rerender(<SkyVisualization palette={palette} cloudCover={40} timeOffsetMinutes={0} />);
+    expect(sky.style.getPropertyValue("--sun-bottom")).toBe("14%");
+    rerender(<SkyVisualization palette={palette} cloudCover={40} timeOffsetMinutes={90} />);
+    expect(sky.style.getPropertyValue("--sun-bottom")).toBe("-22%");
+    expect(sky.style.background).not.toBe(before.background);
+    expect(before.sun).toBe("44%");
+  });
 });
 

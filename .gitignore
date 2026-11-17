@@ -13,6 +13,7 @@ coverage/
 playwright-report/
 test-results/
 dist/
+outputs/
 apps/web/out/
 data/uploads/*
 !data/uploads/.gitkeep
