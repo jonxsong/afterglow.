@@ -3,6 +3,9 @@ import type { Locale } from "@/components/locale-provider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const WEATHER_PROXY = (process.env.NEXT_PUBLIC_WEATHER_PROXY || "").replace(/\/+$/, "");
+const FORECAST_CACHE_KEY = "afterglow:forecast-cache:v1";
+const FORECAST_CACHE_MAX_AGE = 12 * 60 * 60 * 1000;
+const FORECAST_CACHE_LIMIT = 5;
 
 async function fetchWeather(proxyPath: string, directUrl: string): Promise<Response> {
   const endpoints = WEATHER_PROXY ? [`${WEATHER_PROXY}${proxyPath}`, directUrl, directUrl] : [directUrl, directUrl];
@@ -48,13 +51,58 @@ function locationQuery(location: Location): string {
 }
 
 export function getForecast(location: Location): Promise<Forecast> {
-  if (!API_URL) return getOpenMeteoWeekly(location).then((result) => result.days[0]);
+  if (!API_URL) return getWeeklyForecast(location).then((result) => result.days[0]);
   return request(`/api/v1/forecast?${locationQuery(location)}`);
 }
 
-export function getWeeklyForecast(location: Location): Promise<WeeklyForecast> {
-  if (!API_URL) return getOpenMeteoWeekly(location);
-  return request(`/api/v1/forecast/weekly?${locationQuery(location)}`);
+type CachedForecast = {
+  key: string;
+  fetchedAt: number;
+  forecast: WeeklyForecast;
+};
+
+function readForecastCache(): CachedForecast[] {
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(FORECAST_CACHE_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeForecastCache(entry: CachedForecast) {
+  try {
+    const recent = readForecastCache().filter((cached) => cached?.key !== entry.key);
+    window.localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify([entry, ...recent].slice(0, FORECAST_CACHE_LIMIT)));
+  } catch {
+    // The forecast still works when browser storage is unavailable.
+  }
+}
+
+export async function getWeeklyForecast(location: Location): Promise<WeeklyForecast> {
+  const key = locationQuery(location);
+  try {
+    const forecast = API_URL
+      ? await request<WeeklyForecast>(`/api/v1/forecast/weekly?${key}`)
+      : await getOpenMeteoWeekly(location);
+    const fetchedAt = Date.now();
+    if (forecast.days[0]?.date !== localDate(fetchedAt, location.timezone)) {
+      throw new Error("Tonight’s forecast is temporarily unavailable.");
+    }
+    writeForecastCache({ key, fetchedAt, forecast });
+    return { ...forecast, freshness: { source: "live", fetched_at: new Date(fetchedAt).toISOString() } };
+  } catch (error) {
+    const now = Date.now();
+    const cached = readForecastCache().find((entry) =>
+      entry?.key === key &&
+      Number.isFinite(entry.fetchedAt) &&
+      entry.fetchedAt <= now &&
+      now - entry.fetchedAt < FORECAST_CACHE_MAX_AGE &&
+      entry.forecast?.days?.[0]?.date === localDate(now, location.timezone),
+    );
+    if (!cached) throw error;
+    return { ...cached.forecast, freshness: { source: "cache", fetched_at: new Date(cached.fetchedAt).toISOString() } };
+  }
 }
 
 export function uploadObservation(predictionId: string, photo: File): Promise<Evaluation> {
@@ -114,8 +162,8 @@ const PALETTES = {
 };
 
 type OpenMeteoPayload = {
-  hourly: Record<string, Array<string | number | null>>;
-  daily: { sunset: string[] };
+  hourly: Record<string, Array<number | null>>;
+  daily: { sunset: Array<number | null> };
 };
 
 async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<Location[]> {
@@ -133,29 +181,41 @@ function clock(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(date);
 }
 
+function localDate(time: number, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone,
+  }).formatToParts(time);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
 function hexId(input: string): string {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) hash = Math.imul(hash ^ input.charCodeAt(i), 16777619);
   return `web-${(hash >>> 0).toString(16)}-${input.slice(0, 10).replaceAll("-", "")}`;
 }
 
-function at<T extends string | number | null>(payload: OpenMeteoPayload, field: string, index: number, fallback = 0): number {
+function at(payload: OpenMeteoPayload, field: string, index: number, fallback = 0): number {
   const raw = payload.hourly[field]?.[index];
   return raw === null || raw === undefined ? fallback : Number(raw);
 }
 
 async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
   const variables = ["cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "relative_humidity_2m", "visibility", "precipitation_probability"];
-  const params = new URLSearchParams({ latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone, forecast_days: "7", hourly: variables.join(","), daily: "sunset" });
+  const params = new URLSearchParams({ latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone, forecast_days: "7", hourly: variables.join(","), daily: "sunset", timeformat: "unixtime" });
   const response = await fetchWeather(`/forecast?${params}`, `https://api.open-meteo.com/v1/forecast?${params}`);
   if (!response.ok) throw new Error("The atmosphere is temporarily out of reach.");
   const payload = await response.json() as OpenMeteoPayload;
-  const hourlyTimes = payload.hourly.time.map((value) => new Date(String(value)));
-  const days = payload.daily.sunset.map((sunsetValue, dayIndex): Forecast => {
-    const sunset = new Date(sunsetValue);
-    const sunsetLocalMs = sunset.getTime();
+  const hourlyTimes = payload.hourly.time;
+  const sunsets = payload.daily.sunset.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (!hourlyTimes.length || !sunsets.length) throw new Error("Tonight’s forecast is temporarily unavailable.");
+  const distance = (time: number | null, sunset: number) => time === null ? Infinity : Math.abs(time - sunset);
+  const days = sunsets.map((sunsetValue): Forecast => {
+    const sunset = new Date(sunsetValue * 1000);
     let index = 0;
-    for (let i = 1; i < hourlyTimes.length; i += 1) if (Math.abs(hourlyTimes[i].getTime() - sunsetLocalMs) < Math.abs(hourlyTimes[index].getTime() - sunsetLocalMs)) index = i;
+    for (let i = 1; i < hourlyTimes.length; i += 1) {
+      if (distance(hourlyTimes[i], sunsetValue) < distance(hourlyTimes[index], sunsetValue)) index = i;
+    }
     const cloud = at(payload, "cloud_cover", index);
     const low = at(payload, "cloud_cover_low", index);
     const mid = at(payload, "cloud_cover_mid", index);
@@ -176,7 +236,7 @@ async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
     const start = new Date(sunset.getTime() - 24 * 60_000), end = new Date(sunset.getTime() + 22 * 60_000);
     return {
       prediction_id: hexId(`${location.latitude}-${location.longitude}-${sunsetValue}`), model_kind: "heuristic", location,
-      date: sunsetValue.slice(0, 10), sunset_at: sunset.toISOString(), sunset_display: clock(sunset, location.timezone),
+      date: localDate(sunset.getTime(), location.timezone), sunset_at: sunset.toISOString(), sunset_display: clock(sunset, location.timezone),
       best_window_start: start.toISOString(), best_window_end: end.toISOString(), best_window_display: `${clock(start, location.timezone)}–${clock(end, location.timezone)}`,
       palette, dominant_colors: dominant, vibrancy, confidence, summary, interpretation_label: "Forecast interpretation",
       atmosphere: { cloud_cover: Math.round(cloud), low_clouds: Math.round(low), mid_clouds: Math.round(mid), high_clouds: Math.round(high), humidity: Math.round(humidity), visibility_km: Math.round(visibilityKm * 10) / 10, precipitation_probability: Math.round(rain) },

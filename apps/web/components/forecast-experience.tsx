@@ -1,14 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Camera, Check, Cloud, Droplets, Eye, Sparkles, Upload } from "lucide-react";
+import { ArrowRight, Check, Cloud, Droplets, Eye, Sparkles, Upload } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { analyzeSunsetWithAI, getWeeklyForecast, rememberForecastPalette, uploadObservation } from "@/lib/api";
 import type { AiSkyReading, Evaluation, Location } from "@/lib/types";
 import { LocationSearch } from "./location-search";
 import { type CopyKey, type Locale, useLocale } from "./locale-provider";
-import { SkyVisualization } from "./sky-visualization";
+import { SkyTimeline } from "./sky-timeline";
 
 const DEFAULT_LOCATION: Location = {
   name: "San Francisco",
@@ -18,6 +18,8 @@ const DEFAULT_LOCATION: Location = {
   longitude: -122.4194,
   timezone: "America/Los_Angeles",
 };
+
+const EXAMPLE_PALETTE = ["#F7D4AA", "#EEAD7E", "#DA7E7A", "#A66F92", "#665E8B"];
 
 function formatDay(date: string, index: number, locale: Locale, tonight: string) {
   if (index === 0) return tonight;
@@ -73,39 +75,42 @@ export function ForecastExperience() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [aiReading, setAiReading] = useState<AiSkyReading | null>(null);
-  const [timeOffset, setTimeOffset] = useState(0);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("afterglow:recent");
-    if (saved) {
-      try { setRecent(JSON.parse(saved)); } catch { /* ignore invalid local data */ }
-    }
+    try {
+      const saved = window.localStorage.getItem("afterglow:recent");
+      if (saved) {
+        const locations = JSON.parse(saved);
+        if (Array.isArray(locations)) setRecent(locations);
+      }
+    } catch { /* Recent locations are optional. */ }
   }, []);
 
   function selectLocation(next: Location) {
     setLocation(next);
-    setTimeOffset(0);
     setEvaluation(null);
     setSelectedPhoto(null);
     setAiReading(null);
     const updated = [next, ...recent.filter((item) => item.latitude !== next.latitude || item.longitude !== next.longitude)].slice(0, 5);
     setRecent(updated);
-    window.localStorage.setItem("afterglow:recent", JSON.stringify(updated));
+    try { window.localStorage.setItem("afterglow:recent", JSON.stringify(updated)); } catch { /* Recent locations are optional. */ }
   }
 
   const forecast = useQuery({
     queryKey: ["weekly-forecast", location.latitude, location.longitude, location.timezone],
     queryFn: () => getWeeklyForecast(location),
+    retry: false,
   });
   const upload = useMutation({
     mutationFn: ({ predictionId, file }: { predictionId: string; file: File }) => uploadObservation(predictionId, file),
     onSuccess: setEvaluation,
   });
   const tonight = forecast.data?.days[0];
-  const sunsetTime = tonight ? new Date(tonight.sunset_at).getTime() : 0;
-  const formatSkyTime = (offset: number) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+  const freshness = forecast.data?.freshness;
+  const dateLocale = locale === "zh" ? "zh-CN" : "en-US";
+  const cachedAt = freshness?.source === "cache" ? new Intl.DateTimeFormat(dateLocale, {
     hour: "numeric", minute: "2-digit", timeZone: location.timezone,
-  }).format(new Date(sunsetTime + offset * 60_000));
+  }).format(new Date(freshness.fetched_at)) : null;
   const aiAnalysis = useMutation({
     mutationFn: ({ photo }: { photo: File }) => {
       if (!tonight) throw new Error("The forecast is not ready yet.");
@@ -119,42 +124,42 @@ export function ForecastExperience() {
   }, [tonight]);
 
   return (
-    <section id="forecast" className="forecast-section">
-      <div className="section-kicker"><span>01</span><p>{t("tonightForecast")}</p></div>
+    <section id="forecast" className="forecast-section" aria-labelledby="forecast-heading">
+      <div className="forecast-heading">
+        <div>
+          <p className="eyebrow">{t("tonightForecast")}</p>
+          <h2 id="forecast-heading">{localizedLocation(location, locale)}</h2>
+          {tonight && <p className="forecast-date">{new Intl.DateTimeFormat(dateLocale, {
+            year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+          }).format(new Date(`${tonight.date}T12:00:00Z`))}</p>}
+        </div>
+        <LocationSearch onSelect={selectLocation} recent={recent} />
+      </div>
       <AnimatePresence mode="wait">
         {forecast.isLoading && (
-          <motion.div className="forecast-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div key="loading" className="forecast-loading" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="loading-sky" /><p>{t("loading")}</p>
           </motion.div>
         )}
-        {forecast.error && (
-          <motion.div className="forecast-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <p className="eyebrow">{t("errorEyebrow")}</p>
-            <h2>{t("errorTitle")}</h2>
-            <p>{localError(forecast.error.message, locale, t)}</p>
-            <button onClick={() => forecast.refetch()}>{t("tryAgain")} <ArrowRight size={16} /></button>
+        {forecast.error && !tonight && (
+          <motion.div key="unavailable" className="forecast-card forecast-preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="forecast-details forecast-preview-copy">
+              <p className="eyebrow">{t("sampleSky")}</p>
+              <h3>{t("previewTitle")}</h3>
+              <p role="status">{t("previewNote")}</p>
+              <button className="forecast-retry" type="button" disabled={forecast.isFetching} onClick={() => forecast.refetch()}>
+                {t(forecast.isFetching ? "loading" : "tryAgain")} <ArrowRight size={16} aria-hidden />
+              </button>
+            </div>
+            <SkyTimeline palette={EXAMPLE_PALETTE} cloudCover={46} sunsetAt="2000-01-01T18:45:00Z" timezone="UTC" sample />
           </motion.div>
         )}
         {tonight && (
           <motion.div key={tonight.prediction_id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="forecast-heading">
-              <div>
-                <p className="eyebrow">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { year: "numeric", month: "long", day: "numeric" }).format(new Date(`${tonight.date}T12:00:00`))}</p>
-                <h2>{localizedLocation(tonight.location, locale)}</h2>
-              </div>
-              <LocationSearch onSelect={selectLocation} recent={recent} />
-            </div>
+            {cachedAt && <p className="forecast-freshness" role="status">{t("cachedForecast")} <time dateTime={freshness?.fetched_at}>{cachedAt}</time></p>}
 
             <div className="forecast-card">
-              <div className="forecast-visual">
-                <SkyVisualization palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} timeOffsetMinutes={timeOffset} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
-                <div className="sky-timeline">
-                  <div className="sky-timeline-heading"><label htmlFor="sky-time">{t("exploreEvening")}</label><output htmlFor="sky-time">{formatSkyTime(timeOffset)}</output></div>
-                  <input id="sky-time" type="range" min={-90} max={90} step={5} value={timeOffset} onChange={(event) => setTimeOffset(Number(event.target.value))} aria-valuetext={`${formatSkyTime(timeOffset)}, ${timeOffset === 0 ? t("sunset") : timeOffset < 0 ? t("beforeSunset") : t("afterSunset")}`} />
-                  <div className="sky-timeline-marks"><span>{formatSkyTime(-90)}</span><span>{t("sunset")}</span><span>{formatSkyTime(90)}</span></div>
-                  <p>{t("timelineNote")}</p>
-                </div>
-              </div>
+              <SkyTimeline palette={tonight.palette} cloudCover={tonight.atmosphere.cloud_cover} sunsetAt={tonight.sunset_at} timezone={location.timezone} />
               <div className="forecast-details">
                 <div className="sunset-time"><span>{t("sunset")}</span><strong>{tonight.sunset_display}</strong></div>
                 <p className="forecast-summary">“{locale === "zh" ? (summaryZh[tonight.summary] ?? tonight.summary) : tonight.summary}”</p>

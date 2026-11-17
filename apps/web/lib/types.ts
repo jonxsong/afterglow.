@@ -42,6 +42,10 @@ export type WeeklyForecast = {
   location: Location;
   best_prediction_id: string;
   days: Forecast[];
+  freshness?: {
+    source: "live" | "cache";
+    fetched_at: string;
+  };
 };
 
 export type Evaluation = {

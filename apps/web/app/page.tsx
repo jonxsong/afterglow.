@@ -15,11 +15,11 @@ export default function Home() {
       <header className="site-header">
         <a href="#top" aria-label={t("home")}><BrandLogo /></a>
         <div className="header-actions">
-          <nav aria-label={t("navigation")}><a href="#explore">{t("explore")}</a><a href="#about">{t("about")}</a></nav>
+          <nav aria-label={t("navigation")}><a href="#forecast">{t("explore")}</a><a href="#about">{t("about")}</a></nav>
           <LanguageToggle />
           <details className="mobile-menu">
             <summary aria-label={t("openMenu")}><Menu /></summary>
-            <div><a href="#explore">{t("explore")}</a><a href="#about">{t("about")}</a></div>
+            <div><a href="#forecast">{t("explore")}</a><a href="#about">{t("about")}</a></div>
           </details>
         </div>
       </header>
@@ -32,10 +32,9 @@ export default function Home() {
           <a className="primary-cta" href="#forecast">{t("heroCta")} <ArrowDown size={17} /></a>
         </div>
         <div className="hero-art">
-          <SkyVisualization palette={heroPalette} cloudCover={46} interpretationLabel={t("forecastInterpretation")} interactionLabel={t("moveToExplore")} />
-          <p><span>{t("tonightPalette")}</span><b>{t("heroColors")}</b></p>
+          <SkyVisualization palette={heroPalette} cloudCover={46} interpretationLabel={t("sampleSky")} interactionLabel={t("moveToExplore")} />
+          <p><span>{t("examplePalette")}</span><b>{t("heroColors")}</b></p>
         </div>
-        <div className="hero-index">35.7° N<br />{t("california")}</div>
       </section>
 
       <ForecastExperience />
