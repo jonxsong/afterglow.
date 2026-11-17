@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="980" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
   <title id="title">Afterglow system architecture</title>
-  <desc id="desc">An Excalidraw-style diagram showing a visitor using the bilingual Next.js experience. The public Site worker serves the app and protects the optional OpenAI image interpretation endpoint, while forecasts use Open-Meteo. A separate FastAPI, PostgreSQL, Redis, object storage, and offline machine-learning lane supports the full self-hosted architecture.</desc>
+  <desc id="desc">An Excalidraw-style diagram showing a visitor using the bilingual Next.js experience. The public Site worker serves the app, retrieves weather from Open-Meteo or 7Timer, and protects the optional OpenAI image interpretation endpoint. A separate FastAPI, PostgreSQL, Redis, object storage, and offline machine-learning lane supports the full self-hosted architecture.</desc>
   <defs>
     <filter id="paper" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="17" result="noise"/>
@@ -80,9 +80,10 @@
 
   <rect x="920" y="185" width="430" height="154" rx="26" fill="#dce8f1" class="box"/>
   <rect x="924" y="189" width="422" height="146" rx="23" class="echo"/>
-  <text x="954" y="229" class="label">Open-Meteo</text>
+  <text x="954" y="229" class="label">Live weather</text>
   <text x="954" y="262" class="body">geocoding · hourly atmosphere · sunset</text>
   <text x="954" y="289" class="body">cloud layers · humidity · visibility · rain</text>
+  <text x="954" y="315" class="tiny">Open-Meteo · 7Timer backup (NOAA GFS)</text>
   <path d="M1225 230 C1238 205, 1278 206, 1288 232 C1314 226, 1332 244, 1324 264 L1206 264 C1201 245, 1210 233, 1225 230Z" fill="#edf6fb" stroke="#3d3835" stroke-width="2" filter="url(#rough)"/>
 
   <rect x="920" y="382" width="430" height="154" rx="26" fill="#eadce8" class="box"/>

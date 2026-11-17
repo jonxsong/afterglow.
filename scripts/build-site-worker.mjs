@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const staticRoot = path.join(root, "apps", "web", "out");
 const runtimePath = path.join(root, "services", "site-worker", "runtime.mjs");
+const fallbackPath = path.join(root, "services", "site-worker", "seven-timer.mjs");
 const outputPath = path.join(root, "dist", "server", "index.js");
 
 async function filesIn(directory) {
@@ -29,10 +30,11 @@ for (const filePath of await filesIn(staticRoot)) {
   assets[key] = { body: (await readFile(filePath)).toString("base64"), type: mimeType(filePath) };
 }
 
-const runtime = await readFile(runtimePath, "utf8");
+const [runtime, fallback] = await Promise.all([readFile(runtimePath, "utf8"), readFile(fallbackPath, "utf8")]);
 const marker = "export default createWorker({});";
-if (!runtime.includes(marker)) throw new Error("Worker runtime marker was not found.");
-const bundled = `const ASSETS = ${JSON.stringify(assets)};\n${runtime.replace(marker, "export default createWorker(ASSETS);")}`;
+const fallbackImport = 'import { fetchSevenTimerForecast } from "./seven-timer.mjs";';
+if (!runtime.includes(marker) || !runtime.includes(fallbackImport)) throw new Error("Worker runtime markers were not found.");
+const bundled = `const ASSETS = ${JSON.stringify(assets)};\n${fallback}\n${runtime.replace(fallbackImport, "").replace(marker, "export default createWorker(ASSETS);")}`;
 await mkdir(path.dirname(outputPath), { recursive: true });
 await writeFile(outputPath, bundled);
 console.log(`Built site worker with ${Object.keys(assets).length} assets.`);

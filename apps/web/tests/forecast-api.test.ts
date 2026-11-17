@@ -31,6 +31,19 @@ afterEach(() => {
 });
 
 describe("the hosted weather forecast", () => {
+  it("uses the backup weather response directly and preserves its missing metrics", async () => {
+    const fetch = vi.fn(async () => {
+      const payload = await providerForecast().json();
+      return Response.json(payload, { headers: { "x-afterglow-weather-source": "7timer" } });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { getWeeklyForecast } = await import("@/lib/api");
+    const forecast = await getWeeklyForecast(tokyo);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(forecast.weather_source).toBe("7timer");
+    expect(forecast.days[0].atmosphere).toMatchObject({ cloud_cover: 48, visibility_km: null, precipitation_probability: null });
+  });
+
   it("uses the direct provider when the relay is limited and formats the sunset in Tokyo", async () => {
     const fetch = vi.fn((url: string) =>
       Promise.resolve(url.startsWith("/api/") ? new Response(null, { status: 429 }) : providerForecast()),

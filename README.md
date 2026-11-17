@@ -4,7 +4,7 @@
 
 # afterglow.
 
-### Chase the beautiful.
+### View the golden hour.
 
 **Sunset intelligence for people who appreciate beautiful skies.**<br />
 Afterglow predicts the evening palette from live atmospheric data, then lets the real sky answer back through private color comparison and an optional AI interpretation.
@@ -77,7 +77,7 @@ The interface is mobile-first, keyboard accessible, reduced-motion aware, and in
 </div>
 
 Afterglow has two deliberate delivery profiles. The public product is a compact Next.js +
-Site Worker application: forecast data comes from Open-Meteo, local color comparison stays
+Site Worker application: forecast data comes from Open-Meteo or 7Timer, local color comparison stays
 in the browser, and the worker protects the optional OpenAI call. The repository also contains
 a fuller FastAPI modular monolith for durable snapshots, queues, private object storage, and
 self-hosted or AWS deployments.
@@ -99,7 +99,7 @@ Read the deeper [architecture notes](./docs/architecture.md) and [deployment gui
 ```text
 location
    ↓
-Open-Meteo hourly weather + local sunset time
+live weather + local sunset time (Open-Meteo or 7Timer backup)
    ↓
 cloud layers · humidity · visibility · precipitation · forecast horizon
    ↓
@@ -119,7 +119,7 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 | Next.js 15, React 19, TypeScript | Python 3.12, FastAPI, Pydantic | Docker and Docker Compose |
 | TanStack Query, Motion, Tailwind CSS | SQLAlchemy, Alembic, PostgreSQL | AWS ECS Fargate starter |
 | Accessible responsive components | Redis, RQ, Pillow, scikit-learn | Terraform and GitHub Actions |
-| Deterministic CSS sky renderer | Open-Meteo weather and geocoding | Public `afterglow.jonzhang.dev` worker deployment |
+| Deterministic CSS sky renderer | Open-Meteo weather and geocoding, 7Timer backup | Public `afterglow.jonzhang.dev` worker deployment |
 | Bilingual English/Chinese experience | OpenAI vision sky interpretation | Server-side secrets and request throttling |
 
 ## Repository map
@@ -200,7 +200,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
 | `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-Open-Meteo requires no API key. The hosted build routes weather requests through the Site worker for bounded retries and short-lived caching; local development can continue to call Open-Meteo directly. The OpenAI key is used only by the server-side Site worker and must never use a `NEXT_PUBLIC_` prefix or be committed. The deployed site stores it as a protected runtime secret. Each requested AI reading consumes OpenAI API usage; the ordinary forecast and browser-only color comparison do not.
+The hosted worker uses [Open-Meteo](https://open-meteo.com/) first and switches to [7Timer](https://www.7timer.info/) for live NOAA GFS forecasts when Open-Meteo is unavailable. The backup uses three-hour weather samples and omits visibility and rain probability. City search can also use a bundled index adapted from [GeoNames](https://www.geonames.org/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Neither weather feed requires an API key for Afterglow. The optional OpenAI key is a protected runtime secret. AI photo readings consume OpenAI API usage.
 
 ## API surface
 
@@ -255,7 +255,7 @@ See the complete [evaluation contract](./ml/evaluation/README.md).
 - Ordinary weather forecasts do not fully observe aerosols, smoke layers, terrain obstruction, or localized marine layers.
 - Camera exposure, white balance, HDR, editing, crop, and foreground pixels affect observed-color evaluation.
 - The current CIE76 nearest-palette comparison is product feedback, not a scientific accuracy claim.
-- The public deployment performs the forecast directly against Open-Meteo and uses a small server worker for optional AI analysis; the full local/AWS architecture adds durable snapshots, queues, caching, and object storage.
+- The public deployment uses a Site worker for weather retrieval, failover, caching, and optional AI analysis. The full local/AWS architecture adds durable snapshots, queues, caching, and object storage.
 - AI sky readings are visual interpretations, not measurements of aerosols, pollution, or safety-critical weather conditions.
 
 ## Roadmap
@@ -280,6 +280,6 @@ Paid infrastructure is never provisioned automatically. Review [the deployment g
 
 Built for the few minutes each day that never happen the same way twice.
 
-**afterglow.** · *Chase the beautiful.*
+**afterglow.** · *View the golden hour.*
 
 </div>

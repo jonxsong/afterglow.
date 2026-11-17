@@ -9,7 +9,7 @@
     "preview:site": "node --env-file=.env.local scripts/serve-site-worker.mjs",
     "smoke:ai": "node --env-file=.env.local scripts/smoke-ai.mjs",
     "test:web": "pnpm --dir apps/web test",
-    "test:worker": "node --test tests/site-worker.test.mjs",
+    "test:worker": "node --test tests/site-worker.test.mjs tests/seven-timer.test.mjs",
     "test": "pnpm test:web && pnpm test:worker"
   },
   "devDependencies": {

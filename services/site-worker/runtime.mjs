@@ -1,3 +1,5 @@
+import { fetchSevenTimerForecast } from "./seven-timer.mjs";
+
 const TEN_MINUTES = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_BODY_BYTES = 6 * 1024 * 1024;
@@ -5,6 +7,9 @@ const WEATHER_UPSTREAMS = {
   "/api/weather/forecast": { url: "https://api.open-meteo.com/v1/forecast", cacheSeconds: 300 },
   "/api/weather/geocoding": { url: "https://geocoding-api.open-meteo.com/v1/search", cacheSeconds: 86400 },
 };
+const FORECAST_PATH = "/api/weather/forecast";
+const FORECAST_TIMEOUT_MS = 3000;
+const WEATHER_CACHE_LIMIT = 128;
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -97,11 +102,108 @@ function safeForecast(value) {
 
 export function createWorker(assets = {}) {
   const rateLimits = new Map();
+  const recentWeather = new Map();
+  const pendingWeather = new Map();
+  let openMeteoRetryAt = 0;
+
+  function forecastResult(result) {
+    return json(result.payload, 200, {
+      "cache-control": `public, max-age=${result.maxAge}`,
+      "x-afterglow-weather-source": result.source,
+      "x-content-type-options": "nosniff",
+    });
+  }
+
+  async function loadLiveForecast(location, params, localDay) {
+    if (Date.now() >= openMeteoRetryAt) {
+      try {
+        const response = await fetch(`${WEATHER_UPSTREAMS[FORECAST_PATH].url}?${params}`, {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS),
+        });
+        if (response.status === 429) {
+          const header = response.headers.get("retry-after");
+          const retrySeconds = header && /^\d+$/.test(header) ? Number(header) : 0;
+          const retryDate = header ? Date.parse(header) : NaN;
+          openMeteoRetryAt = Math.max(Date.now() + Math.max(retrySeconds, 60) * 1000, Number.isFinite(retryDate) ? retryDate : 0);
+        }
+        if (response.ok) {
+          const payload = await response.json();
+          const times = payload?.hourly?.time;
+          const sunsets = payload?.daily?.sunset;
+          if (Array.isArray(times) && times.length && Array.isArray(sunsets) && sunsets.some((time) =>
+            Number.isFinite(time) && localDay.format(time * 1000) === localDay.format(Date.now()))) {
+            return { payload, maxAge: 300, source: "open-meteo" };
+          }
+        } else {
+          await response.body?.cancel();
+        }
+      } catch { /* Try the independent feed after a timeout or unreadable reply. */ }
+    }
+
+    const backup = await fetchSevenTimerForecast({ ...location, now: Date.now() }).catch(() => null);
+    return backup ? { ...backup, source: "7timer" } : null;
+  }
+
+  async function liveForecast(requestUrl) {
+    const params = requestUrl.searchParams;
+    const latitude = Number(params.get("latitude"));
+    const longitude = Number(params.get("longitude"));
+    const timezone = params.get("timezone");
+    if (!params.get("latitude")?.trim() || !params.get("longitude")?.trim() || !timezone ||
+      !Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180) {
+      return errorResponse("Valid coordinates and a time zone are required.");
+    }
+
+    let localDay;
+    try { localDay = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, dateStyle: "short" }); }
+    catch { return errorResponse("A valid time zone is required."); }
+
+    const location = { latitude: Number(latitude.toFixed(3)), longitude: Number(longitude.toFixed(3)), timezone };
+    const upstream = new URLSearchParams({
+      latitude: String(location.latitude), longitude: String(location.longitude), timezone,
+      forecast_days: "7", timeformat: "unixtime", daily: "sunset",
+      hourly: "cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m,visibility,precipitation_probability",
+    });
+    const cacheKey = new URL(FORECAST_PATH, requestUrl.origin);
+    cacheKey.search = upstream;
+    cacheKey.searchParams.set("afterglow_day", localDay.format(Date.now()));
+    const key = cacheKey.href;
+    const recent = recentWeather.get(key);
+    if (recent && recent.expires > Date.now()) {
+      return forecastResult({ ...recent.result, maxAge: Math.max(0, Math.floor((recent.expires - Date.now()) / 1000)) });
+    }
+    const edgeCache = globalThis.caches?.default;
+    if (edgeCache) {
+      const response = await edgeCache.match(key).catch(() => null);
+      if (response) return response;
+    }
+
+    // Cloudflare fetch and cache I/O is scoped to the current request.
+    let inflight = edgeCache ? undefined : pendingWeather.get(key);
+    if (!inflight) {
+      inflight = loadLiveForecast(location, upstream, localDay).then(async (result) => {
+        if (!result) return null;
+        recentWeather.delete(key);
+        recentWeather.set(key, { result, expires: Date.now() + result.maxAge * 1000 });
+        if (recentWeather.size > WEATHER_CACHE_LIMIT) recentWeather.delete(recentWeather.keys().next().value);
+        if (edgeCache) await edgeCache.put(key, forecastResult(result)).catch(() => {});
+        return result;
+      });
+      if (!edgeCache) {
+        inflight = inflight.finally(() => pendingWeather.delete(key));
+        pendingWeather.set(key, inflight);
+      }
+    }
+    const result = await inflight;
+    return result ? forecastResult(result) : errorResponse("The atmosphere is temporarily out of reach.", 503, { "retry-after": "30" });
+  }
 
   async function proxyWeather(request, pathname) {
     if (request.method !== "GET") return errorResponse("Method not allowed.", 405, { allow: "GET" });
     const upstream = WEATHER_UPSTREAMS[pathname];
     const requestUrl = new URL(request.url);
+    if (pathname === FORECAST_PATH && requestUrl.searchParams.get("timeformat") === "unixtime") return liveForecast(requestUrl);
     const upstreamUrl = `${upstream.url}?${requestUrl.searchParams}`;
     let lastStatus = 503;
 
@@ -109,6 +211,7 @@ export function createWorker(assets = {}) {
       try {
         const response = await fetch(upstreamUrl, {
           headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS),
         });
         lastStatus = response.status;
         if (response.ok || (response.status < 500 && response.status !== 429)) {
@@ -122,6 +225,7 @@ export function createWorker(assets = {}) {
           });
         }
         await response.body?.cancel();
+        if (lastStatus === 429) break;
       } catch {
         lastStatus = 503;
       }

@@ -10,12 +10,12 @@ export type Location = {
 
 export type Atmosphere = {
   cloud_cover: number;
-  low_clouds: number;
-  mid_clouds: number;
-  high_clouds: number;
-  humidity: number;
-  visibility_km: number;
-  precipitation_probability: number;
+  low_clouds: number | null;
+  mid_clouds: number | null;
+  high_clouds: number | null;
+  humidity: number | null;
+  visibility_km: number | null;
+  precipitation_probability: number | null;
 };
 
 export type Forecast = {
@@ -42,6 +42,7 @@ export type WeeklyForecast = {
   location: Location;
   best_prediction_id: string;
   days: Forecast[];
+  weather_source?: "open-meteo" | "7timer";
   freshness?: {
     source: "live" | "cache";
     fetched_at: string;

@@ -105,6 +105,7 @@ export function LocationSearch({ onSelect, recent }: Props) {
           <div className="search-results">
             {searchReady && results.isFetching && <p className="search-note" role="status">{t("searchingMap")}</p>}
             {searchReady && results.error && <p className="search-error" role="status">{locale === "zh" ? t("locationSearchUnavailable") : results.error.message}</p>}
+            {searchReady && !results.isFetching && results.data?.length === 0 && <p className="search-note" role="status">{t("noCities")}</p>}
             {searchReady && results.data?.map((location) => (
               <button type="button" key={`${location.latitude}-${location.longitude}`} onClick={() => choose(location)}>
                 <MapPin size={17} aria-hidden />
@@ -122,6 +123,7 @@ export function LocationSearch({ onSelect, recent }: Props) {
               </>
             )}
           </div>
+          <p className="search-note source-credit">{t("cityIndexCredit")} <a href="https://www.geonames.org/">GeoNames</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
         </div>
       </dialog>
     </>

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("home page presents the brand and forecast entry point", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /chase the beautiful/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /view the golden hour/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /see tonight’s sky/i })).toBeVisible();
   await expect(page.getByRole("img", { name: "Sample sunset" }).first()).toBeVisible();
 });
@@ -63,5 +63,27 @@ test("offers an interactive example and a keyboard accessible city picker in an 
   await expect(page.getByRole("slider", { name: "探索傍晚时光" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "探索一场示例日落" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("finds Tokyo from the bundled city index and presents a sourced backup forecast", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-17T20:00:00Z"));
+  await page.route(/\/(geocoding|search)\?/, (route) => route.fulfill({ status: 429 }));
+  await page.route(/\/forecast\?/, (route) => {
+    const timeZone = new URL(route.request().url()).searchParams.get("timezone");
+    const sunset = Date.parse(timeZone === "Asia/Tokyo" ? "2026-11-18T07:32:00Z" : "2026-11-18T00:56:00Z") / 1000;
+    return route.fulfill({ headers: { "x-afterglow-weather-source": "7timer" }, json: {
+      hourly: { time: [sunset], cloud_cover: [50], relative_humidity_2m: [42.5] },
+      daily: { sunset: [sunset] },
+    } });
+  });
+  await page.goto("/#forecast");
+  await page.getByRole("button", { name: "Change location" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox").fill("Tokyo");
+  await dialog.getByRole("button", { name: /^Tokyo\b/i }).first().click();
+  await expect(page.getByRole("heading", { name: /^Tokyo\b/i })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Explore the evening" })).toHaveAttribute("aria-valuetext", "4:32 PM, Sunset");
+  await expect(page.getByRole("link", { name: "7Timer (NOAA GFS)" })).toBeVisible();
+  await expect(page.getByText("Rain chance unavailable")).toBeVisible();
 });
 

@@ -7,18 +7,18 @@ const FORECAST_CACHE_KEY = "afterglow:forecast-cache:v1";
 const FORECAST_CACHE_MAX_AGE = 12 * 60 * 60 * 1000;
 const FORECAST_CACHE_LIMIT = 5;
 
-async function fetchWeather(proxyPath: string, directUrl: string): Promise<Response> {
-  const endpoints = WEATHER_PROXY ? [`${WEATHER_PROXY}${proxyPath}`, directUrl, directUrl] : [directUrl, directUrl];
+async function fetchWeather(proxyPath: string, directUrl: string, proxyTimeout = 10_000): Promise<Response> {
+  const endpoints = WEATHER_PROXY ? [
+    { url: `${WEATHER_PROXY}${proxyPath}`, timeout: proxyTimeout },
+    { url: directUrl, timeout: 4_000 },
+  ] : [{ url: directUrl, timeout: 6_000 }];
   let lastResponse: Response | null = null;
-  for (const endpoint of endpoints) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
+  for (const { url, timeout } of endpoints) {
     try {
-      const response = await fetch(endpoint, { signal: controller.signal });
-      if (response.ok || (response.status < 500 && response.status !== 429)) return response;
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+      if (response.ok || (response.status < 500 && response.status !== 429 && response.status !== 408)) return response;
       lastResponse = response;
     } catch { /* try the same-origin proxy or direct provider fallback */ }
-    finally { clearTimeout(timeout); }
   }
   return lastResponse ?? new Response(null, { status: 503 });
 }
@@ -33,9 +33,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function searchLocations(query: string, locale: Locale = "en"): Promise<Location[]> {
-  if (!API_URL) return searchOpenMeteoLocations(query, locale);
-  return request(`/api/v1/locations/search?q=${encodeURIComponent(query)}&language=${locale}`);
+export async function searchLocations(query: string, locale: Locale = "en"): Promise<Location[]> {
+  if (API_URL) return request(`/api/v1/locations/search?q=${encodeURIComponent(query)}&language=${locale}`);
+  try {
+    const online = await searchOpenMeteoLocations(query, locale);
+    if (online.length) return online;
+  } catch {
+    // The bundled index remains available during a provider outage.
+  }
+  const { searchFallbackCities } = await import("./city-fallback");
+  return searchFallbackCities(query, locale);
 }
 
 function locationQuery(location: Location): string {
@@ -168,7 +175,7 @@ type OpenMeteoPayload = {
 
 async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<Location[]> {
   const params = new URLSearchParams({ name: query, count: "8", language: locale, format: "json" });
-  const response = await fetchWeather(`/geocoding?${params}`, `https://geocoding-api.open-meteo.com/v1/search?${params}`);
+  const response = await fetchWeather(`/geocoding?${params}`, `https://geocoding-api.open-meteo.com/v1/search?${params}`, 3_000);
   if (!response.ok) throw new Error("Location search is temporarily unavailable.");
   const payload = await response.json();
   return (payload.results ?? []).filter((item: Record<string, unknown>) => item.name && item.country && item.timezone).map((item: Record<string, unknown>) => ({
@@ -195,9 +202,9 @@ function hexId(input: string): string {
   return `web-${(hash >>> 0).toString(16)}-${input.slice(0, 10).replaceAll("-", "")}`;
 }
 
-function at(payload: OpenMeteoPayload, field: string, index: number, fallback = 0): number {
+function at(payload: OpenMeteoPayload, field: string, index: number): number | null {
   const raw = payload.hourly[field]?.[index];
-  return raw === null || raw === undefined ? fallback : Number(raw);
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
 async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
@@ -205,46 +212,54 @@ async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
   const params = new URLSearchParams({ latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone, forecast_days: "7", hourly: variables.join(","), daily: "sunset", timeformat: "unixtime" });
   const response = await fetchWeather(`/forecast?${params}`, `https://api.open-meteo.com/v1/forecast?${params}`);
   if (!response.ok) throw new Error("The atmosphere is temporarily out of reach.");
+  const weatherSource = response.headers.get("x-afterglow-weather-source") === "7timer" ? "7timer" : "open-meteo";
   const payload = await response.json() as OpenMeteoPayload;
   const hourlyTimes = payload.hourly.time;
   const sunsets = payload.daily.sunset.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   if (!hourlyTimes.length || !sunsets.length) throw new Error("Tonight’s forecast is temporarily unavailable.");
   const distance = (time: number | null, sunset: number) => time === null ? Infinity : Math.abs(time - sunset);
-  const days = sunsets.map((sunsetValue): Forecast => {
+  const days = sunsets.flatMap((sunsetValue): Forecast[] => {
     const sunset = new Date(sunsetValue * 1000);
     let index = 0;
     for (let i = 1; i < hourlyTimes.length; i += 1) {
       if (distance(hourlyTimes[i], sunsetValue) < distance(hourlyTimes[index], sunsetValue)) index = i;
     }
     const cloud = at(payload, "cloud_cover", index);
+    if (cloud === null || (weatherSource === "7timer" && distance(hourlyTimes[index], sunsetValue) > 3 * 3600)) return [];
     const low = at(payload, "cloud_cover_low", index);
     const mid = at(payload, "cloud_cover_mid", index);
     const high = at(payload, "cloud_cover_high", index);
     const humidity = at(payload, "relative_humidity_2m", index);
-    const visibilityKm = at(payload, "visibility", index, 10000) / 1000;
+    const visibility = at(payload, "visibility", index);
+    const visibilityKm = visibility === null ? null : visibility / 1000;
     const rain = at(payload, "precipitation_probability", index);
-    const illumination = 1 - Math.min(1, Math.abs((high + mid) / 2 - 48) / 55);
-    const clearHorizon = Math.max(0, 1 - low / 92);
-    const visibilityBonus = Math.min(12, Math.max(-8, (visibilityKm - 10) * 0.6));
+    const illuminatedClouds = mid === null || high === null ? cloud : (high + mid) / 2;
+    const illumination = 1 - Math.min(1, Math.abs(illuminatedClouds - 48) / 55);
+    const clearHorizon = Math.max(0, 1 - (low ?? cloud) / 92);
+    const visibilityBonus = visibilityKm === null ? 0 : Math.min(12, Math.max(-8, (visibilityKm - 10) * 0.6));
     const horizon = Math.max(0, (sunset.getTime() - Date.now()) / 3_600_000);
-    const vibrancy = Math.max(8, Math.min(98, Math.round(28 + 42 * illumination + 28 * clearHorizon + visibilityBonus - Math.max(0, (humidity - 72) * .32) - rain * .22)));
-    const confidence = Math.max(38, Math.min(94, Math.round(94 - Math.min(32, Math.max(0, horizon - 12) * .18) - Math.min(12, rain * .08))));
+    const rainPenalty = (rain ?? 0) * .22;
+    const humidityPenalty = humidity === null ? 0 : Math.max(0, (humidity - 72) * .32);
+    const vibrancy = Math.max(8, Math.min(98, Math.round(28 + 42 * illumination + 28 * clearHorizon + visibilityBonus - humidityPenalty - rainPenalty)));
+    const baselineConfidence = weatherSource === "7timer" ? 80 : 94;
+    const confidence = Math.max(38, Math.round(baselineConfidence - Math.min(32, Math.max(0, horizon - 12) * .18) - Math.min(12, (rain ?? 0) * .08)));
     let palette = PALETTES.soft, dominant = ["Peach", "Rose", "Lavender"], summary = "Soft color with a gentle, lingering afterglow.";
-    if (low > 78 || rain > 72) { palette = PALETTES.muted; dominant = ["Pewter", "Mauve", "Slate"]; summary = "Quiet color behind a soft, clouded horizon."; }
-    else if (high + mid > 85 && clearHorizon > .45) { palette = PALETTES.dramatic; dominant = ["Amber", "Rose", "Plum"]; summary = "A layered sky with a strong chance of dramatic color."; }
+    if ((low ?? cloud) > 78 || (rain ?? 0) > 72) { palette = PALETTES.muted; dominant = ["Pewter", "Mauve", "Slate"]; summary = "Quiet color behind a soft, clouded horizon."; }
+    else if (high !== null && mid !== null && high + mid > 85 && clearHorizon > .45) { palette = PALETTES.dramatic; dominant = ["Amber", "Rose", "Plum"]; summary = "A layered sky with a strong chance of dramatic color."; }
     else if (cloud < 22) { palette = PALETTES.clear; dominant = ["Apricot", "Coral", "Violet"]; summary = "A clean horizon, warm at first and violet after."; }
     const start = new Date(sunset.getTime() - 24 * 60_000), end = new Date(sunset.getTime() + 22 * 60_000);
-    return {
+    return [{
       prediction_id: hexId(`${location.latitude}-${location.longitude}-${sunsetValue}`), model_kind: "heuristic", location,
       date: localDate(sunset.getTime(), location.timezone), sunset_at: sunset.toISOString(), sunset_display: clock(sunset, location.timezone),
       best_window_start: start.toISOString(), best_window_end: end.toISOString(), best_window_display: `${clock(start, location.timezone)}–${clock(end, location.timezone)}`,
       palette, dominant_colors: dominant, vibrancy, confidence, summary, interpretation_label: "Forecast interpretation",
-      atmosphere: { cloud_cover: Math.round(cloud), low_clouds: Math.round(low), mid_clouds: Math.round(mid), high_clouds: Math.round(high), humidity: Math.round(humidity), visibility_km: Math.round(visibilityKm * 10) / 10, precipitation_probability: Math.round(rain) },
+      atmosphere: { cloud_cover: Math.round(cloud), low_clouds: low, mid_clouds: mid, high_clouds: high, humidity, visibility_km: visibilityKm === null ? null : Math.round(visibilityKm * 10) / 10, precipitation_probability: rain },
       forecast_horizon_hours: horizon,
-    };
+    }];
   });
+  if (!days.length) throw new Error("Tonight’s forecast is temporarily unavailable.");
   const best = days.reduce((left, right) => right.vibrancy > left.vibrancy ? right : left);
-  return { location, best_prediction_id: best.prediction_id, days };
+  return { location, best_prediction_id: best.prediction_id, days, weather_source: weatherSource };
 }
 
 const savedPalettes = new Map<string, string[]>();

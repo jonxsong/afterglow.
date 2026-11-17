@@ -112,6 +112,8 @@ export function ForecastExperience() {
     onSuccess: setEvaluation,
   });
   const tonight = forecast.data?.days[0];
+  const weatherSource = forecast.data?.weather_source;
+  const backupWeather = weatherSource === "7timer";
   const liveUnavailable = Boolean(forecast.error && !tonight);
   const previewing = showSample || liveUnavailable;
   const freshness = forecast.data?.freshness;
@@ -197,10 +199,11 @@ export function ForecastExperience() {
             </div>
 
             <div className="atmosphere-grid">
-              <article><Cloud /><span>{t("cloudCover")}</span><strong>{tonight.atmosphere.cloud_cover}%</strong><small>{tonight.atmosphere.high_clouds}% {t("highCloud")}</small></article>
-              <article><Droplets /><span>{t("humidity")}</span><strong>{tonight.atmosphere.humidity}%</strong><small>{tonight.atmosphere.precipitation_probability}% {t("rainChance")}</small></article>
-              <article><Eye /><span>{t("visibility")}</span><strong>{tonight.atmosphere.visibility_km} km</strong><small>{t("sunsetHour")}</small></article>
+              <article><Cloud /><span>{t("cloudCover")}</span><strong>{backupWeather && "≈"}{tonight.atmosphere.cloud_cover}%</strong><small>{tonight.atmosphere.high_clouds === null ? t("sunsetHour") : `${backupWeather ? "≈" : ""}${Math.round(tonight.atmosphere.high_clouds)}% ${t("highCloud")}`}</small></article>
+              <article><Droplets /><span>{t("humidity")}</span><strong>{tonight.atmosphere.humidity === null ? "—" : `${backupWeather ? "≈" : ""}${Math.round(tonight.atmosphere.humidity)}%`}</strong><small>{tonight.atmosphere.precipitation_probability === null ? t("rainChanceUnavailable") : `${Math.round(tonight.atmosphere.precipitation_probability)}% ${t("rainChance")}`}</small></article>
+              <article><Eye /><span>{t("visibility")}</span><strong>{tonight.atmosphere.visibility_km === null ? "—" : `${tonight.atmosphere.visibility_km} km`}</strong><small>{t(tonight.atmosphere.visibility_km === null ? "weatherFieldUnavailable" : "sunsetHour")}</small></article>
             </div>
+            {weatherSource && <p className="method-note weather-source">{t("weatherData")} <a href={backupWeather ? "https://www.7timer.info/" : "https://open-meteo.com/"}>{backupWeather ? "7Timer (NOAA GFS)" : "Open-Meteo"}</a>{backupWeather && ` · ${t("backupWeatherNote")}`}</p>}
             <p className="method-note"><span>{t("heuristic")}</span> {t("method")}</p>
 
             <div className="weekly-block" id="explore">

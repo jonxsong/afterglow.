@@ -38,6 +38,37 @@ test("proxies and caches Open-Meteo forecast requests", async () => {
   }
 });
 
+test("uses fresh 7Timer weather when Open-Meteo returns 429 and backs off during the limit", async (t) => {
+  const calls = [];
+  t.mock.method(Date, "now", () => Date.parse("2026-11-17T22:00:00Z"));
+  t.mock.method(globalThis, "fetch", async (input) => {
+    const url = new URL(input);
+    calls.push(url.hostname);
+    if (url.hostname === "api.open-meteo.com") return new Response(null, { status: 429, headers: { "retry-after": "90" } });
+    assert.equal(url.hostname, "www.7timer.info");
+    return Response.json({
+      product: "meteo", init: "2026111718",
+      dataseries: Array.from({ length: 64 }, (_, i) => ({ timepoint: (i + 1) * 3, cloudcover: 5, rh2m: 4 })),
+    });
+  });
+  const worker = createWorker();
+  const forecastRequest = (latitude, longitude, timezone) => new Request(
+    `https://afterglow.test/api/weather/forecast?${new URLSearchParams({ latitude, longitude, timezone, timeformat: "unixtime" })}`,
+  );
+  const sf = forecastRequest("37.7749", "-122.4194", "America/Los_Angeles");
+  const response = await worker.fetch(sf);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-afterglow-weather-source"), "7timer");
+  const data = await response.json();
+  assert.equal(data.hourly.cloud_cover[0], 50);
+  assert.equal(data.hourly.visibility[0], null);
+  assert.equal(data.daily.sunset.length, 7);
+  assert.equal((await worker.fetch(sf)).status, 200);
+  const tokyo = await worker.fetch(forecastRequest("35.6762", "139.6503", "Asia/Tokyo"));
+  assert.equal(tokyo.headers.get("x-afterglow-weather-source"), "7timer");
+  assert.deepEqual(calls, ["api.open-meteo.com", "www.7timer.info", "www.7timer.info"]);
+});
+
 test("retries transient weather failures", async () => {
   const originalFetch = globalThis.fetch;
   let attempts = 0;

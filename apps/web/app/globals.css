@@ -46,8 +46,8 @@ a:hover .brand-mark { transform: translateY(-1px) rotate(-2deg); }
 .hero { min-height: calc(100svh - 92px); display: grid; grid-template-columns: minmax(350px, .8fr) minmax(500px, 1.2fr); align-items: center; gap: clamp(42px, 7vw, 120px); padding: clamp(64px, 8vh, 108px) clamp(24px, 5vw, 76px) 80px; position: relative; overflow: hidden; }
 .hero-copy { max-width: 610px; position: relative; z-index: 2; }
 .eyebrow { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .2em; line-height: 1.4; margin: 0 0 24px; text-transform: uppercase; }
-.hero h1 { font-family: var(--serif); font-size: clamp(72px, 8.2vw, 138px); font-weight: 400; line-height: .79; letter-spacing: -.065em; margin: 0; }
-.hero h1.hero-title-zh { font-family: "Noto Serif SC", "Songti SC", SimSun, var(--serif); font-size: clamp(62px, 7.2vw, 118px); line-height: .96; letter-spacing: -.055em; }
+.hero h1 { font-family: var(--serif); font-size: clamp(52px, 6.05vw, 88px); font-weight: 400; line-height: .94; letter-spacing: -.055em; margin: 0; }
+.hero h1.hero-title-zh { font-family: "Noto Serif SC", "Songti SC", SimSun, var(--serif); font-size: clamp(48px, 5.2vw, 76px); line-height: 1.03; letter-spacing: -.045em; }
 .hero h1 em, .about-grid em { color: #b87079; font-weight: 400; }
 .hero-description { color: var(--muted); font-family: var(--serif); font-size: clamp(19px, 2vw, 25px); line-height: 1.45; margin: 46px 0 34px; max-width: 420px; }
 .primary-cta { background: var(--charcoal); color: white; display: inline-flex; align-items: center; gap: 30px; border-radius: 999px; padding: 17px 24px 17px 26px; font-size: 13px; font-weight: 650; transition: transform .25s ease, background .25s ease; }
@@ -167,6 +167,8 @@ a:hover .brand-mark { transform: translateY(-1px) rotate(-2deg); }
 .atmosphere-grid small { color: #8f8680; font-size: 10px; }
 .method-note { max-width: 1240px; margin: 14px auto 0; color: #887f79; font-size: 10px; text-align: right; }
 .method-note span { color: #6e5559; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin-right: 5px; }
+.weather-source a, .source-credit a { text-decoration: underline; text-underline-offset: 2px; }
+.source-credit { margin: 20px 10px 0; }
 
 .weekly-block, .verify-block { max-width: 1240px; margin: 132px auto 0; }
 .weekly-heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
@@ -288,7 +290,7 @@ footer small { color: #a9a19b; grid-column: 1 / -1; font-size: 9px; text-align: 
 
 @media (max-width: 1000px) {
   .hero { grid-template-columns: 1fr 1fr; gap: 40px; }
-  .hero h1 { font-size: clamp(63px, 9vw, 92px); }
+  .hero h1 { font-size: clamp(47px, 6.5vw, 65px); }
   .forecast-card { grid-template-columns: 1fr 1fr; }
   .forecast-details { padding: 34px; }
   .week-grid { overflow-x: auto; grid-template-columns: repeat(7, 145px); }
@@ -305,7 +307,8 @@ footer small { color: #a9a19b; grid-column: 1 / -1; font-size: 9px; text-align: 
   .language-toggle { font-size: 9px; padding: 4px 7px; }
   .mobile-menu { display: block; }
   .hero { min-height: auto; display: flex; flex-direction: column; align-items: stretch; padding: 44px 20px 58px; gap: 40px; }
-  .hero h1 { font-size: clamp(68px, 21vw, 94px); }
+  .hero h1 { font-size: clamp(44px, 13vw, 64px); }
+  .hero h1.hero-title-zh { font-size: clamp(40px, 11.5vw, 60px); }
   .hero-description { margin-top: 34px; }
   .hero-art { min-height: 500px; }
   .hero-art .sky { min-height: 455px; border-radius: 160px 160px 12px 12px; }
