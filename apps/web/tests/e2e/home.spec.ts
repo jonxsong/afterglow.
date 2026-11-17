@@ -87,3 +87,51 @@ test("finds Tokyo from the bundled city index and presents a sourced backup fore
   await expect(page.getByText("Rain chance unavailable")).toBeVisible();
 });
 
+test("shares a selected city's forecast with a fresh visitor", async ({ page, browser }) => {
+  const stubForecast = async (target: typeof page, timeZones: string[] = []) => {
+    await target.clock.setFixedTime(new Date("2026-11-17T20:00:00Z"));
+    await target.route(/\/forecast\?/, (route) => {
+      const timeZone = new URL(route.request().url()).searchParams.get("timezone") ?? "";
+      timeZones.push(timeZone);
+      const sunset = Date.parse(timeZone === "Asia/Tokyo" ? "2026-11-18T07:32:00Z" : "2026-11-18T00:56:00Z") / 1000;
+      return route.fulfill({ json: { hourly: { time: [sunset], cloud_cover: [50] }, daily: { sunset: [sunset] } } });
+    });
+  };
+  await stubForecast(page);
+  await page.route(/\/(geocoding|search)\?/, (route) => route.fulfill({ json: { results: [
+    { name: "Tokyo", latitude: 35.6762, longitude: 139.6503, timezone: "Asia/Tokyo", country: "Japan" },
+  ] } }));
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+    writeText: async (value: string) => sessionStorage.setItem("testClipboard", value),
+  } }));
+  await page.goto("/#forecast");
+  await page.getByRole("button", { name: "Change location" }).click();
+  await page.getByRole("dialog").getByRole("textbox").fill("Tokyo");
+  await page.getByRole("button", { name: /Tokyo Japan/i }).click();
+  await page.getByRole("button", { name: "Share forecast" }).click();
+  await expect(page.getByRole("button", { name: "Link copied" })).toBeVisible();
+  const shareLink = await page.evaluate(() => sessionStorage.getItem("testClipboard") ?? "");
+  expect(new URL(shareLink).hash).toBe("#forecast");
+
+  const recipient = await browser.newPage();
+  try {
+    const requestedTimeZones: string[] = [];
+    await stubForecast(recipient, requestedTimeZones);
+    await recipient.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async () => { throw new DOMException("Denied", "NotAllowedError"); },
+    } }));
+    await recipient.goto(shareLink);
+    await expect(recipient.getByRole("heading", { name: "Tokyo" })).toBeVisible();
+    await expect(recipient.getByRole("slider", { name: "Explore the evening" })).toHaveAttribute("aria-valuetext", "4:32 PM, Sunset");
+    expect(requestedTimeZones).toEqual(["Asia/Tokyo"]);
+    await expect.poll(() => recipient.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    await recipient.getByRole("button", { name: "Share forecast" }).click();
+    const manualLink = recipient.getByRole("textbox", { name: "Copy this forecast link" });
+    await expect(manualLink).toBeFocused();
+    await expect(manualLink).toHaveValue(shareLink);
+  } finally {
+    await recipient.close();
+  }
+});
+

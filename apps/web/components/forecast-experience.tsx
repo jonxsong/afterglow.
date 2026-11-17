@@ -5,7 +5,9 @@ import { ArrowRight, Check, Cloud, Droplets, Eye, Sparkles, Upload } from "lucid
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { analyzeSunsetWithAI, getWeeklyForecast, rememberForecastPalette, uploadObservation } from "@/lib/api";
+import { readForecastShareLocation } from "@/lib/forecast-share";
 import type { AiSkyReading, Evaluation, Location } from "@/lib/types";
+import { ForecastShareButton } from "./forecast-share-button";
 import { LocationSearch } from "./location-search";
 import { type CopyKey, type Locale, useLocale } from "./locale-provider";
 import { SkyTimeline } from "./sky-timeline";
@@ -75,6 +77,7 @@ function localError(message: string, locale: Locale, t: (key: CopyKey) => string
 export function ForecastExperience() {
   const { locale, t } = useLocale();
   const [location, setLocation] = useState<Location>(DEFAULT_LOCATION);
+  const [locationReady, setLocationReady] = useState(false);
   const [recent, setRecent] = useState<Location[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -82,6 +85,9 @@ export function ForecastExperience() {
   const [showSample, setShowSample] = useState(false);
 
   useEffect(() => {
+    const sharedLocation = readForecastShareLocation(window.location.search);
+    if (sharedLocation) setLocation(sharedLocation);
+    setLocationReady(true);
     try {
       const saved = window.localStorage.getItem("afterglow:recent");
       if (saved) {
@@ -105,6 +111,7 @@ export function ForecastExperience() {
   const forecast = useQuery({
     queryKey: ["weekly-forecast", location.latitude, location.longitude, location.timezone],
     queryFn: () => getWeeklyForecast(location),
+    enabled: locationReady,
     retry: false,
   });
   const upload = useMutation({
@@ -143,10 +150,17 @@ export function ForecastExperience() {
             year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
           }).format(new Date(`${tonight.date}T12:00:00Z`))}</p>}
         </div>
-        <LocationSearch onSelect={selectLocation} recent={recent} />
+        <div className="forecast-actions">
+          <LocationSearch onSelect={selectLocation} recent={recent} />
+          <ForecastShareButton
+            key={`${location.name}:${location.latitude}:${location.longitude}:${location.timezone}`}
+            location={location}
+            disabled={!locationReady}
+          />
+        </div>
       </div>
       <AnimatePresence mode="wait">
-        {forecast.isLoading && !previewing && (
+        {(!locationReady || forecast.isLoading) && !previewing && (
           <motion.div key="loading" className="forecast-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="loading-sky" aria-hidden /><p role="status">{t("loading")}</p>
             <button className="sky-play" type="button" onClick={() => setShowSample(true)}>{t("previewTitle")}</button>

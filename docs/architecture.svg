@@ -1,136 +1,95 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="980" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="750" viewBox="0 0 1120 750" role="img" aria-labelledby="title description">
   <title id="title">Afterglow system architecture</title>
-  <desc id="desc">An Excalidraw-style diagram showing a visitor using the bilingual Next.js experience. The public Site worker serves the app, retrieves weather from Open-Meteo or 7Timer, and protects the optional OpenAI image interpretation endpoint. A separate FastAPI, PostgreSQL, Redis, object storage, and offline machine-learning lane supports the full self-hosted architecture.</desc>
+  <desc id="description">The public Next.js browser app creates shareable city forecast links and computes sunset colors from weather served by a Site Worker. The Worker uses Open-Meteo or its 7Timer backup and sends photos to OpenAI only when requested. A separate self-hosted Next.js and FastAPI deployment uses PostgreSQL, Redis, and private object storage, with offline model evaluation separate from live inference.</desc>
+
   <defs>
-    <filter id="paper" x="-10%" y="-10%" width="120%" height="120%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="17" result="noise"/>
-      <feColorMatrix in="noise" type="saturate" values="0" result="grain"/>
-      <feComponentTransfer in="grain" result="softGrain"><feFuncA type="table" tableValues="0 0.035"/></feComponentTransfer>
-      <feBlend in="SourceGraphic" in2="softGrain" mode="multiply"/>
-    </filter>
-    <filter id="rough" x="-8%" y="-8%" width="116%" height="116%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.06" numOctaves="1" seed="9" result="warp"/>
-      <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-    <marker id="arrow" markerWidth="13" markerHeight="13" refX="10" refY="6.5" orient="auto" markerUnits="strokeWidth">
-      <path d="M1,1 L11,6.5 L1,12" fill="none" stroke="#4c4541" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 9 4.5 0 9Z" fill="#80778a"/>
     </marker>
     <style>
-      .title { font: 700 42px "Comic Sans MS", "Segoe Print", cursive; fill: #24211f; }
-      .subtitle { font: 400 17px Inter, Arial, sans-serif; fill: #625b57; letter-spacing: 1px; }
-      .group { font: 700 14px Inter, Arial, sans-serif; fill: #766d68; letter-spacing: 2.4px; }
-      .label { font: 700 23px "Comic Sans MS", "Segoe Print", cursive; fill: #24211f; }
-      .body { font: 400 15px Inter, Arial, sans-serif; fill: #514b47; }
-      .tiny { font: 400 12.5px Inter, Arial, sans-serif; fill: #6d6560; }
-      .box { stroke: #3d3835; stroke-width: 2.2; filter: url(#rough); }
-      .echo { fill: none; stroke: #3d3835; stroke-width: .9; opacity: .42; filter: url(#rough); }
-      .edge { fill: none; stroke: #4c4541; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); filter: url(#rough); }
-      .dash { stroke-dasharray: 8 8; }
+      text { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+      .title { font-size: 34px; font-weight: 700; letter-spacing: -0.8px; fill: #272232; }
+      .section { font-size: 21px; font-weight: 700; fill: #332a42; }
+      .heading { font-size: 19px; font-weight: 700; fill: #272232; }
+      .body { font-size: 16px; font-weight: 400; fill: #4f485a; }
+      .note { font-size: 14px; font-weight: 500; fill: #665b70; }
+      .card { fill: #fff; stroke: #dcd5df; stroke-width: 1.2; }
+      .flow { fill: none; stroke: #80778a; stroke-width: 1.7; stroke-linejoin: round; marker-end: url(#arrow); }
     </style>
   </defs>
 
-  <rect width="1440" height="980" fill="#fbf8f2" filter="url(#paper)"/>
-  <path d="M78 114 C290 72, 478 104, 680 77 S1087 90, 1362 62" fill="none" stroke="#d58ca6" stroke-width="4" opacity=".55" filter="url(#rough)"/>
-  <text x="72" y="70" class="title">afterglow. — system map</text>
-  <text x="75" y="101" class="subtitle">FORECAST THE COLOR · EXPERIENCE THE SKY · LEARN WHAT ACTUALLY HAPPENED</text>
+  <rect width="1120" height="750" rx="18" fill="#faf8f5"/>
+  <rect x="32.5" y="28.5" width="50" height="50" rx="13" fill="#f2e3ed" stroke="#e4d2e2"/>
+  <path d="M45 59.5h25M49 56a8.5 8.5 0 0 1 17 0M50 64.5h15" fill="none" stroke="#784d76" stroke-width="2.2" stroke-linecap="round"/>
+  <text x="100" y="63" class="title">Afterglow architecture</text>
+  <text x="100" y="89" class="body">Sunset color forecasts and photo comparison</text>
+  <path d="M32 112.5h1056" stroke="#e1dbe5"/>
 
-  <text x="72" y="157" class="group">EXPERIENCE</text>
-  <text x="430" y="157" class="group">PUBLIC RUNTIME</text>
-  <text x="932" y="157" class="group">ATMOSPHERE + AI</text>
+  <g aria-label="Public deployment">
+    <rect x="32.5" y="133.5" width="1055" height="278" rx="16" fill="#f2edf5" stroke="#e2d8e8"/>
+    <text x="56" y="166" class="section">Public deployment</text>
+    <text x="1064" y="164.5" class="note" text-anchor="end">afterglow.jonzhang.dev</text>
 
-  <rect x="70" y="185" width="292" height="132" rx="28" fill="#f7d5bd" class="box"/>
-  <rect x="74" y="189" width="284" height="124" rx="25" class="echo"/>
-  <circle cx="116" cy="228" r="20" fill="#fff6ee" stroke="#3d3835" stroke-width="2"/>
-  <path d="M86 285 C92 255, 140 255, 146 285" fill="#fff6ee" stroke="#3d3835" stroke-width="2" filter="url(#rough)"/>
-  <text x="164" y="225" class="label">Sky chaser</text>
-  <text x="164" y="252" class="body">finds tonight’s horizon</text>
-  <text x="164" y="278" class="body">chooses whether to look up</text>
+    <rect x="56" y="185" width="306" height="202" rx="11" class="card"/>
+    <text x="74" y="218" class="heading">Next.js in the browser</text>
+    <text x="74" y="247" class="body">City search + GeoNames fallback</text>
+    <text x="74" y="272" class="body">Shareable city forecast links</text>
+    <text x="74" y="297" class="body">Heuristic forecast + sky timeline</text>
+    <text x="74" y="322" class="body">Private photo palette comparison</text>
+    <path d="M74 340.5h270" stroke="#eee8f0"/>
+    <text x="74" y="365" class="note">Same-day saved forecast during outages</text>
 
-  <rect x="70" y="375" width="292" height="252" rx="26" fill="#efd8e2" class="box"/>
-  <rect x="74" y="379" width="284" height="244" rx="23" class="echo"/>
-  <text x="99" y="420" class="label">Next.js experience</text>
-  <text x="99" y="454" class="body">• English / 中文</text>
-  <text x="99" y="481" class="body">• tonight + seven evenings</text>
-  <text x="99" y="508" class="body">• interactive sky renderer</text>
-  <text x="99" y="535" class="body">• local palette comparison</text>
-  <text x="99" y="562" class="body">• opt-in AI sky reading</text>
-  <rect x="99" y="586" width="214" height="20" rx="10" fill="#f9c58b"/>
-  <rect x="142" y="586" width="43" height="20" fill="#f08b6e"/>
-  <rect x="185" y="586" width="43" height="20" fill="#cf6683"/>
-  <rect x="228" y="586" width="43" height="20" fill="#8e638f"/>
-  <rect x="271" y="586" width="42" height="20" rx="0 10 10 0" fill="#4c5278"/>
+    <rect x="418" y="185" width="294" height="202" rx="11" class="card"/>
+    <text x="436" y="218" class="heading">Site Worker</text>
+    <text x="436" y="247" class="body">Serves the static Next.js app</text>
+    <text x="436" y="272" class="body">Weather relay, cache and failover</text>
+    <text x="436" y="297" class="body">Opt-in AI photo analysis route</text>
+    <path d="M436 340.5h258" stroke="#eee8f0"/>
+    <text x="436" y="365" class="note">OpenAI key stays in the Worker</text>
 
-  <rect x="418" y="185" width="408" height="220" rx="27" fill="#e8e1f4" class="box"/>
-  <rect x="422" y="189" width="400" height="212" rx="24" class="echo"/>
-  <text x="454" y="229" class="label">Public Site worker</text>
-  <text x="454" y="263" class="body">serves the exported Next.js application</text>
-  <text x="454" y="290" class="body">GET /api/weather/* · POST /api/ai/analyze</text>
-  <text x="454" y="317" class="body">weather retry/cache · AI throttling</text>
-  <rect x="454" y="340" width="328" height="41" rx="12" fill="#f8f4ff" stroke="#796d91" stroke-width="1.4"/>
-  <text x="472" y="365" class="tiny">🔒 OPENAI_API_KEY stays server-side</text>
+    <rect x="768" y="185" width="296" height="94" rx="11" class="card"/>
+    <text x="786" y="214" class="heading">Weather providers</text>
+    <text x="786" y="240" class="body">Open-Meteo weather + geocoding</text>
+    <text x="786" y="262" class="body">7Timer backup · NOAA GFS</text>
 
-  <rect x="418" y="474" width="408" height="214" rx="27" fill="#f7d9c9" class="box"/>
-  <rect x="422" y="478" width="400" height="206" rx="24" class="echo"/>
-  <text x="454" y="518" class="label">Full self-hosted stack</text>
-  <text x="454" y="552" class="body">FastAPI · validation · OpenAPI</text>
-  <text x="454" y="579" class="body">solar geometry + forecast domain</text>
-  <text x="454" y="606" class="body">immutable snapshots + evaluations</text>
-  <path d="M456 639 C505 618, 554 653, 604 632 S708 619, 785 645" fill="none" stroke="#b87079" stroke-width="3" filter="url(#rough)"/>
-  <text x="454" y="669" class="tiny">optional durable path for local / AWS deployments</text>
+    <rect x="768" y="293" width="296" height="94" rx="11" class="card"/>
+    <text x="786" y="322" class="heading">OpenAI Responses API</text>
+    <text x="786" y="348" class="body">Optional photo interpretation</text>
+    <text x="786" y="370" class="body">Response storage disabled</text>
 
-  <rect x="920" y="185" width="430" height="154" rx="26" fill="#dce8f1" class="box"/>
-  <rect x="924" y="189" width="422" height="146" rx="23" class="echo"/>
-  <text x="954" y="229" class="label">Live weather</text>
-  <text x="954" y="262" class="body">geocoding · hourly atmosphere · sunset</text>
-  <text x="954" y="289" class="body">cloud layers · humidity · visibility · rain</text>
-  <text x="954" y="315" class="tiny">Open-Meteo · 7Timer backup (NOAA GFS)</text>
-  <path d="M1225 230 C1238 205, 1278 206, 1288 232 C1314 226, 1332 244, 1324 264 L1206 264 C1201 245, 1210 233, 1225 230Z" fill="#edf6fb" stroke="#3d3835" stroke-width="2" filter="url(#rough)"/>
+    <path d="M369 272h42" class="flow"/>
+    <path d="M719 236h42" class="flow"/>
+    <path d="M719 339h42" class="flow" stroke-dasharray="5 4"/>
+  </g>
 
-  <rect x="920" y="382" width="430" height="154" rx="26" fill="#eadce8" class="box"/>
-  <rect x="924" y="386" width="422" height="146" rx="23" class="echo"/>
-  <text x="954" y="426" class="label">OpenAI Responses API</text>
-  <text x="954" y="459" class="body">vision interpretation + structured output</text>
-  <text x="954" y="486" class="body">color story · mood · forecast match · photo tip</text>
-  <text x="954" y="513" class="tiny">store: false · called only after explicit user action</text>
+  <g aria-label="Self-hosted deployment">
+    <rect x="32.5" y="433.5" width="1055" height="284" rx="16" fill="#f7eee7" stroke="#eadfd7"/>
+    <text x="56" y="466" class="section">Self-hosted deployment</text>
+    <text x="1064" y="464.5" class="note" text-anchor="end">Docker or AWS</text>
 
-  <rect x="920" y="581" width="200" height="124" rx="24" fill="#e7edda" class="box"/>
-  <rect x="924" y="585" width="192" height="116" rx="21" class="echo"/>
-  <text x="950" y="622" class="label">PostgreSQL</text>
-  <text x="950" y="652" class="body">forecast snapshots</text>
-  <text x="950" y="677" class="body">scores + locations</text>
+    <rect x="56" y="484" width="276" height="129" rx="11" class="card"/>
+    <text x="74" y="515" class="heading">Next.js web app</text>
+    <text x="74" y="544" class="body">City selection and forecasts</text>
+    <text x="74" y="569" class="body">Sunset photo submission</text>
 
-  <rect x="1150" y="581" width="200" height="124" rx="24" fill="#f4dfd2" class="box"/>
-  <rect x="1154" y="585" width="192" height="116" rx="21" class="echo"/>
-  <text x="1187" y="622" class="label">Redis + S3</text>
-  <text x="1180" y="652" class="body">cache + job locks</text>
-  <text x="1180" y="677" class="body">private photo storage</text>
+    <rect x="388" y="484" width="296" height="129" rx="11" class="card"/>
+    <text x="406" y="515" class="heading">FastAPI</text>
+    <text x="406" y="544" class="body">Open-Meteo forecast input</text>
+    <text x="406" y="569" class="body">Solar geometry + heuristics</text>
+    <text x="406" y="594" class="body">Snapshots and photo evaluation</text>
 
-  <rect x="418" y="777" width="932" height="112" rx="26" fill="#f1eee6" class="box"/>
-  <rect x="422" y="781" width="924" height="104" rx="23" class="echo"/>
-  <text x="454" y="821" class="label">Offline ML lane — intentionally gated from production</text>
-  <text x="454" y="853" class="body">consented labels → feature extraction → time/location split → train + evaluate</text>
-  <text x="1087" y="853" class="tiny">promote only if it beats the heuristic baseline</text>
+    <rect x="740" y="484" width="324" height="129" rx="11" class="card"/>
+    <text x="758" y="515" class="heading">Storage and jobs</text>
+    <text x="758" y="544" class="body">PostgreSQL · forecasts + locations</text>
+    <text x="758" y="569" class="body">Redis / RQ · caching and jobs</text>
+    <text x="758" y="594" class="body">Private objects · photo storage</text>
 
-  <path d="M216 318 L216 363" class="edge"/>
-  <text x="230" y="349" class="tiny">opens</text>
-  <path d="M363 445 C387 405, 397 332, 408 311" class="edge"/>
-  <text x="376" y="391" class="tiny" transform="rotate(-72 376 391)">AI request</text>
-  <path d="M827 330 C870 344, 879 427, 908 447" class="edge"/>
-  <text x="843" y="388" class="tiny" transform="rotate(56 843 388)">vision</text>
-  <path d="M363 510 C386 458, 420 434, 528 434 C706 434, 801 296, 908 265" class="edge"/>
-  <text x="612" y="419" class="tiny" transform="rotate(-18 612 419)">public forecast data</text>
-  <path d="M363 578 L407 578" class="edge dash"/>
-  <text x="367" y="560" class="tiny">self-hosted</text>
-  <path d="M827 557 C859 536, 877 318, 908 299" class="edge dash"/>
-  <path d="M827 611 C862 610, 880 628, 908 634" class="edge"/>
-  <path d="M827 650 C930 726, 1136 732, 1247 715" class="edge"/>
-  <path d="M1020 716 L1020 766" class="edge dash"/>
-  <path d="M621 699 L621 766" class="edge dash"/>
+    <path d="M339 549h42" class="flow"/>
+    <path d="M691 549h42" class="flow"/>
 
-  <path d="M74 728 C160 701, 270 715, 361 696" fill="none" stroke="#8d83ba" stroke-width="3" filter="url(#rough)"/>
-  <text x="72" y="765" class="group">DELIVERY</text>
-  <text x="72" y="798" class="body">Public: afterglow.jonzhang.dev</text>
-  <text x="72" y="825" class="body">Local: Next.js + FastAPI</text>
-  <text x="72" y="852" class="body">Cloud: ECS · RDS · Redis · S3</text>
-  <text x="72" y="890" class="tiny">Forecast ≠ safety-critical weather advice</text>
+    <rect x="56" y="634" width="1008" height="59" rx="11" fill="#fdfaf7" stroke="#c7b5c2" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="74" y="659" class="heading">Offline model evaluation</text>
+    <text x="74" y="680" class="note">Separate from live inference</text>
+    <text x="359" y="669" class="body">Consented labels → features → time/location split → train and evaluate</text>
+  </g>
 </svg>

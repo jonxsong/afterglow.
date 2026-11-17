@@ -66,6 +66,8 @@ request uses `store: false`.
 
 The interface is mobile-first, keyboard accessible, reduced-motion aware, and intentionally unlike a conventional weather dashboard.
 
+To share a city, choose **Change location** in Tonight’s Forecast, then select **Share forecast** and paste the copied link. It opens directly to the selected city’s latest forecast. Links made from your device location use approximate coordinates.
+
 ## Architecture
 
 <div align="center">
