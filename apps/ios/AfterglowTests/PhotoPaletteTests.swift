@@ -24,7 +24,7 @@ final class PhotoPaletteTests: XCTestCase {
 
     func testPaletteUsesTheSkyCropAndFallsBackWithAnEmptyMask() {
         let peach: [UInt8] = [242, 178, 141, 255]
-        let pixels = Array(repeating: peach, count: 4).flatMap { $0 } + [0, 0, 0, 255]
+        let pixels: [UInt8] = Array(repeating: peach, count: 4).flatMap { $0 } + [0, 0, 0, 255]
 
         XCTAssertEqual(PhotoPaletteComparison.extractPalette(width: 1, height: 5, rgba: pixels), ["#F2B28D"])
         XCTAssertEqual(PhotoPaletteComparison.extractPalette(
