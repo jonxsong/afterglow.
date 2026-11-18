@@ -15,7 +15,7 @@ Afterglow predicts the evening palette from live atmospheric data, then lets the
 [![OpenAI](https://img.shields.io/badge/OpenAI-vision_readings-8D83BA?style=for-the-badge&logo=openai&logoColor=white)](#ai-sky-readings)
 [![Tests](https://img.shields.io/badge/tests-passing-657D69?style=for-the-badge&logo=pytest&logoColor=white)](#quality)
 
-[**Open Afterglow ↗**](https://afterglow.jonzhang.dev/) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
+[**Open Afterglow ↗**](https://afterglow.jonzhang.dev/) · [iPhone app](./apps/ios/README.md) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
 
 <br />
 
@@ -87,6 +87,7 @@ self-hosted or AWS deployments.
 | Layer | Responsibilities |
 | --- | --- |
 | **Next.js web** | Editorial UI, location search, query lifecycle, deterministic sky visualization, responsive interactions |
+| **SwiftUI iPhone app** | Location-first onboarding, live and saved forecasts from the site worker, an interactive sunset timeline, and on-device photo comparison |
 | **Hosted site worker** | Shared forecast API, weather validation and failover, D1 forecast snapshots, static assets, optional AI analysis |
 | **FastAPI application** | Validation, forecast orchestration, immutable snapshots, uploads, evaluations, OpenAPI |
 | **Forecast domain** | Solar position, sunset windows, atmospheric feature engineering, palettes, vibrancy, confidence |
