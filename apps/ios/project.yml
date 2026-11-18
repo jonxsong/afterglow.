@@ -35,10 +35,20 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.jonzhang.afterglow.tests
     dependencies:
       - target: Afterglow
+  AfterglowUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [AfterglowUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jonzhang.afterglow.uitests
+    dependencies:
+      - target: Afterglow
 schemes:
   Afterglow:
     build:
       targets:
         Afterglow: all
     test:
-      targets: [AfterglowTests]
+      targets: [AfterglowTests, AfterglowUITests]

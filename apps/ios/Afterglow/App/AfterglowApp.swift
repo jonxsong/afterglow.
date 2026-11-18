@@ -3,14 +3,22 @@ import SwiftUI
 @main
 @MainActor
 struct AfterglowApp: App {
-    private let service: AfterglowAPI
+    private let service: any ForecastService
     private let deviceLocation = DeviceLocationService()
     @StateObject private var session: ForecastSession
 
     init() {
-        let service = AfterglowAPI()
+        var service: any ForecastService = AfterglowAPI()
+        var store = LocalForecastStore()
+        #if DEBUG
+        if let testEnvironment = UITestForecastService.launchEnvironment() {
+            service = testEnvironment.service
+            store = testEnvironment.store
+        }
+        #endif
         self.service = service
-        _session = StateObject(wrappedValue: ForecastSession(service: service, store: LocalForecastStore()))
+        let session = ForecastSession(service: service, store: store)
+        _session = StateObject(wrappedValue: session)
     }
 
     var body: some Scene {
