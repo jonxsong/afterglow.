@@ -1,0 +1,79 @@
+name: iOS Simulator
+
+on:
+  push:
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the installed Xcode toolchain
+        run: |
+          xcode_version=$(xcodebuild -version)
+          printf '%s\n' "$xcode_version"
+          major=$(awk 'NR == 1 { split($2, version, "."); print version[1] }' <<< "$xcode_version")
+          if [[ ! "$major" =~ ^[0-9]+$ || "$major" -lt 26 ]]; then
+            echo 'Xcode 26 or newer is required.' >&2
+            exit 1
+          fi
+      - name: Generate the Xcode project
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
+          xcodegen generate
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          device=$(xcrun simctl list devices available --json | jq -r '
+            .devices | to_entries
+            | map(select(.key | test("\\.iOS-[0-9]+(-[0-9]+)*$")))
+            | sort_by(.key | split(".iOS-")[1] | split("-") | map(tonumber))
+            | reverse
+            | [.[].value[] | select(.isAvailable and (.name | startswith("iPhone")))]
+            | first // empty
+          ')
+          if [[ -z "$device" ]]; then
+            echo 'The runner has no available iPhone simulator.' >&2
+            xcrun simctl list devices
+            exit 1
+          fi
+          device_id=$(jq -er '.udid' <<< "$device")
+          jq -r '"Using \(.name) (\(.udid))"' <<< "$device"
+          printf 'id=%s\n' "$device_id" >> "$GITHUB_OUTPUT"
+      - name: Build and run XCTest on the simulator
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+        run: |
+          xcodebuild -project Afterglow.xcodeproj -scheme Afterglow \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 120 -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/Afterglow.xcresult" \
+            CODE_SIGNING_ALLOWED=NO test
+      - name: Upload the XCTest result bundle
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Afterglow-XCTest
+          path: ${{ runner.temp }}/Afterglow.xcresult
+          if-no-files-found: ignore
