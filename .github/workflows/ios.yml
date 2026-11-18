@@ -90,3 +90,9 @@ jobs:
           name: Afterglow-Screenshots
           path: ${{ runner.temp }}/Afterglow-Screenshots/
           if-no-files-found: error
+      - name: Build the unsigned iPhone Release configuration
+        run: |
+          xcodebuild -project Afterglow.xcodeproj -scheme Afterglow \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/Afterglow-Device" \
+            CODE_SIGNING_ALLOWED=NO build
