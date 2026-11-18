@@ -1,4 +1,6 @@
 import { fetchSevenTimerForecast } from "./seven-timer.mjs";
+import { readForecastSnapshot, saveForecastSnapshot } from "./forecast-store.mjs";
+import { forecastFromWeather, forecastLocalDate, forecastWeatherFields } from "../../apps/web/lib/forecast-core.mjs";
 
 const TEN_MINUTES = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
@@ -8,8 +10,11 @@ const WEATHER_UPSTREAMS = {
   "/api/weather/geocoding": { url: "https://geocoding-api.open-meteo.com/v1/search", cacheSeconds: 86400 },
 };
 const FORECAST_PATH = "/api/weather/forecast";
+const WEEKLY_FORECAST_PATH = "/api/v1/forecast/weekly";
 const FORECAST_TIMEOUT_MS = 3000;
+const SNAPSHOT_READ_TIMEOUT_MS = 1200;
 const WEATHER_CACHE_LIMIT = 128;
+const FORECAST_FORMAT = "v1";
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -100,6 +105,32 @@ function safeForecast(value) {
   };
 }
 
+function weatherSnapshotPayload(payload) {
+  return {
+    hourly: Object.fromEntries(["time", ...forecastWeatherFields]
+      .filter((field) => Array.isArray(payload.hourly[field]))
+      .map((field) => [field, payload.hourly[field]])),
+    daily: { sunset: payload.daily.sunset },
+  };
+}
+
+function locationLabel(value) {
+  return value?.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 100) ?? "";
+}
+
+async function loadSavedForecast(db, key) {
+  if (!db) return null;
+  let timer;
+  try {
+    return await Promise.race([
+      readForecastSnapshot(db, key, Date.now()),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), SNAPSHOT_READ_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function createWorker(assets = {}) {
   const rateLimits = new Map();
   const recentWeather = new Map();
@@ -110,11 +141,12 @@ export function createWorker(assets = {}) {
     return json(result.payload, 200, {
       "cache-control": `public, max-age=${result.maxAge}`,
       "x-afterglow-weather-source": result.source,
+      "x-afterglow-weather-fetched-at": new Date(result.fetchedAt).toISOString(),
       "x-content-type-options": "nosniff",
     });
   }
 
-  async function loadLiveForecast(location, params, localDay) {
+  async function loadLiveForecast(location, params) {
     if (Date.now() >= openMeteoRetryAt) {
       try {
         const response = await fetch(`${WEATHER_UPSTREAMS[FORECAST_PATH].url}?${params}`, {
@@ -129,11 +161,9 @@ export function createWorker(assets = {}) {
         }
         if (response.ok) {
           const payload = await response.json();
-          const times = payload?.hourly?.time;
-          const sunsets = payload?.daily?.sunset;
-          if (Array.isArray(times) && times.length && Array.isArray(sunsets) && sunsets.some((time) =>
-            Number.isFinite(time) && localDay.format(time * 1000) === localDay.format(Date.now()))) {
-            return { payload, maxAge: 300, source: "open-meteo" };
+          const fetchedAt = Date.now();
+          if (forecastFromWeather(location, payload, "open-meteo", fetchedAt)) {
+            return { payload, maxAge: 300, source: "open-meteo", fetchedAt };
           }
         } else {
           await response.body?.cancel();
@@ -142,52 +172,58 @@ export function createWorker(assets = {}) {
     }
 
     const backup = await fetchSevenTimerForecast({ ...location, now: Date.now() }).catch(() => null);
-    return backup ? { ...backup, source: "7timer" } : null;
+    const fetchedAt = Date.now();
+    if (!backup || !forecastFromWeather(location, backup.payload, "7timer", fetchedAt)) return null;
+    return { ...backup, source: "7timer", fetchedAt };
   }
 
-  async function liveForecast(requestUrl) {
-    const params = requestUrl.searchParams;
-    const latitude = Number(params.get("latitude"));
-    const longitude = Number(params.get("longitude"));
-    const timezone = params.get("timezone");
-    if (!params.get("latitude")?.trim() || !params.get("longitude")?.trim() || !timezone ||
-      !Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180) {
-      return errorResponse("Valid coordinates and a time zone are required.");
-    }
-
-    let localDay;
-    try { localDay = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, dateStyle: "short" }); }
-    catch { return errorResponse("A valid time zone is required."); }
-
-    const location = { latitude: Number(latitude.toFixed(3)), longitude: Number(longitude.toFixed(3)), timezone };
+  async function currentWeather(origin, location, localDay, cityDayKey, db, ctx) {
     const upstream = new URLSearchParams({
-      latitude: String(location.latitude), longitude: String(location.longitude), timezone,
+      latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone,
       forecast_days: "7", timeformat: "unixtime", daily: "sunset",
-      hourly: "cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,relative_humidity_2m,visibility,precipitation_probability",
+      hourly: forecastWeatherFields.join(","),
     });
-    const cacheKey = new URL(FORECAST_PATH, requestUrl.origin);
-    cacheKey.search = upstream;
-    cacheKey.searchParams.set("afterglow_day", localDay.format(Date.now()));
+    const cacheKey = new URL(FORECAST_PATH, origin);
+    cacheKey.searchParams.set("afterglow_cache_key", cityDayKey);
     const key = cacheKey.href;
     const recent = recentWeather.get(key);
     if (recent && recent.expires > Date.now()) {
-      return forecastResult({ ...recent.result, maxAge: Math.max(0, Math.floor((recent.expires - Date.now()) / 1000)) });
+      return { ...recent.result, maxAge: Math.max(0, Math.floor((recent.expires - Date.now()) / 1000)) };
     }
     const edgeCache = globalThis.caches?.default;
     if (edgeCache) {
-      const response = await edgeCache.match(key).catch(() => null);
-      if (response) return response;
+      try {
+        const response = await edgeCache.match(key);
+        if (response?.ok) {
+          const source = response.headers.get("x-afterglow-weather-source");
+          const fetchedAt = Date.parse(response.headers.get("x-afterglow-weather-fetched-at"));
+          const age = Date.now() - fetchedAt;
+          const maxAge = (source === "7timer" ? 600 : 300) - Math.ceil(age / 1000);
+          if ((source === "open-meteo" || source === "7timer") && age >= 0 && maxAge >= 0) {
+            const payload = await response.json();
+            if (forecastFromWeather(location, payload, source)) return { payload, source, fetchedAt, maxAge };
+          }
+        }
+      } catch { /* Treat an unreadable edge entry as a cache miss. */ }
     }
 
     // Cloudflare fetch and cache I/O is scoped to the current request.
     let inflight = edgeCache ? undefined : pendingWeather.get(key);
     if (!inflight) {
-      inflight = loadLiveForecast(location, upstream, localDay).then(async (result) => {
+      inflight = loadLiveForecast(location, upstream).then(async (result) => {
         if (!result) return null;
+        if (forecastLocalDate(result.fetchedAt, location.timezone) !== localDay) return result;
         recentWeather.delete(key);
-        recentWeather.set(key, { result, expires: Date.now() + result.maxAge * 1000 });
+        recentWeather.set(key, { result, expires: result.fetchedAt + result.maxAge * 1000 });
         if (recentWeather.size > WEATHER_CACHE_LIMIT) recentWeather.delete(recentWeather.keys().next().value);
-        if (edgeCache) await edgeCache.put(key, forecastResult(result)).catch(() => {});
+        const writes = Promise.all([
+          saveForecastSnapshot(db, cityDayKey, {
+            payload: weatherSnapshotPayload(result.payload), source: result.source, fetchedAt: result.fetchedAt,
+          }).catch(() => {}),
+          edgeCache?.put(key, forecastResult(result)).catch(() => {}),
+        ]);
+        if (ctx?.waitUntil) ctx.waitUntil(writes);
+        else await writes;
         return result;
       });
       if (!edgeCache) {
@@ -195,15 +231,51 @@ export function createWorker(assets = {}) {
         pendingWeather.set(key, inflight);
       }
     }
-    const result = await inflight;
-    return result ? forecastResult(result) : errorResponse("The atmosphere is temporarily out of reach.", 503, { "retry-after": "30" });
+    return inflight;
   }
 
-  async function proxyWeather(request, pathname) {
+  async function liveForecast(requestUrl, env, ctx, weekly = false) {
+    const params = requestUrl.searchParams;
+    const latitude = Number(params.get("latitude"));
+    const longitude = Number(params.get("longitude"));
+    const timezone = params.get("timezone");
+    if (!params.get("latitude")?.trim() || !params.get("longitude")?.trim() || !timezone || timezone.length > 64 ||
+      !Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180) {
+      return errorResponse("Valid coordinates and a time zone are required.");
+    }
+
+    let localDay;
+    try { localDay = forecastLocalDate(Date.now(), timezone); }
+    catch { return errorResponse("A valid time zone is required."); }
+
+    const rounded = { latitude: Number(latitude.toFixed(3)), longitude: Number(longitude.toFixed(3)), timezone };
+    const cityDayKey = `${FORECAST_FORMAT}|${rounded.latitude}|${rounded.longitude}|${timezone}|${localDay}`;
+    const result = await currentWeather(requestUrl.origin, rounded, localDay, cityDayKey, env?.DB, ctx);
+    const unavailable = () => errorResponse("The atmosphere is temporarily out of reach.", 503, { "retry-after": "30" });
+    if (!weekly) return result ? forecastResult(result) : unavailable();
+
+    const snapshot = result ?? await loadSavedForecast(env?.DB, cityDayKey);
+    if (!snapshot) return unavailable();
+    const now = Date.now();
+    if (!result && forecastLocalDate(snapshot.fetchedAt, timezone) !== forecastLocalDate(now, timezone)) return unavailable();
+    // Weather is reusable across visitors; labels belong only to the current response.
+    const location = {
+      ...rounded,
+      name: locationLabel(params.get("name")) || "Selected location",
+      country: locationLabel(params.get("country")),
+      region: locationLabel(params.get("region")) || null,
+    };
+    const forecast = forecastFromWeather(location, snapshot.payload, snapshot.source, now);
+    if (!forecast) return unavailable();
+    const freshness = { source: result ? "live" : "cache", fetched_at: new Date(snapshot.fetchedAt).toISOString() };
+    return json({ ...forecast, freshness });
+  }
+
+  async function proxyWeather(request, pathname, env, ctx) {
     if (request.method !== "GET") return errorResponse("Method not allowed.", 405, { allow: "GET" });
     const upstream = WEATHER_UPSTREAMS[pathname];
     const requestUrl = new URL(request.url);
-    if (pathname === FORECAST_PATH && requestUrl.searchParams.get("timeformat") === "unixtime") return liveForecast(requestUrl);
+    if (pathname === FORECAST_PATH && requestUrl.searchParams.get("timeformat") === "unixtime") return liveForecast(requestUrl, env, ctx);
     const upstreamUrl = `${upstream.url}?${requestUrl.searchParams}`;
     let lastStatus = 503;
 
@@ -304,11 +376,16 @@ export function createWorker(assets = {}) {
   }
 
   return {
-    async fetch(request, env = {}) {
-      const pathname = new URL(request.url).pathname;
+    async fetch(request, env = {}, ctx) {
+      const url = new URL(request.url);
+      const { pathname } = url;
       if (pathname === "/health") return json({ status: "ok", service: "afterglow" });
       if (pathname === "/api/ai/analyze") return analyze(request, env);
-      if (WEATHER_UPSTREAMS[pathname]) return proxyWeather(request, pathname);
+      if (pathname === WEEKLY_FORECAST_PATH) {
+        if (request.method !== "GET") return errorResponse("Method not allowed.", 405, { allow: "GET" });
+        return liveForecast(url, env, ctx, true);
+      }
+      if (WEATHER_UPSTREAMS[pathname]) return proxyWeather(request, pathname, env, ctx);
       if (request.method !== "GET" && request.method !== "HEAD") return errorResponse("Method not allowed.", 405);
       return serveAsset(request);
     },

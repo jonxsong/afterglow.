@@ -3,6 +3,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   api:
     runs-on: ubuntu-latest
@@ -11,21 +14,36 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r services/api/requirements.txt
-      - run: pytest
+      - run: python -m pytest
         env: { ENVIRONMENT: test, DATABASE_URL: "sqlite:///./ci.sqlite3" }
       - run: alembic -c services/api/alembic.ini upgrade head
         env: { DATABASE_URL: "sqlite:///./migration.sqlite3" }
 
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile=false
-      - run: pnpm --dir apps/web test
-      - run: pnpm --dir apps/web build
-        env: { NEXT_PUBLIC_API_URL: "http://localhost:8000" }
+        with: { node-version: 24 }
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build:site
+      - run: pnpm --dir apps/web exec playwright install --with-deps chromium
+      - name: Test desktop and mobile against the built Site Worker
+        run: |
+          PORT=3000 node scripts/serve-site-worker.mjs &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --silent --fail --max-time 1 http://127.0.0.1:3000/health >/dev/null; then
+              pnpm --dir apps/web test:e2e
+              exit $?
+            fi
+            kill -0 "$worker_pid" || exit 1
+            sleep 1
+          done
+          echo 'The built Site Worker preview did not become ready.' >&2
+          exit 1
 

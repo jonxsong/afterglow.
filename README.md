@@ -87,7 +87,7 @@ self-hosted or AWS deployments.
 | Layer | Responsibilities |
 | --- | --- |
 | **Next.js web** | Editorial UI, location search, query lifecycle, deterministic sky visualization, responsive interactions |
-| **Hosted site worker** | Static asset delivery, protected OpenAI Responses API proxy, validation, rate limiting |
+| **Hosted site worker** | Shared forecast API, weather validation and failover, D1 forecast snapshots, static assets, optional AI analysis |
 | **FastAPI application** | Validation, forecast orchestration, immutable snapshots, uploads, evaluations, OpenAPI |
 | **Forecast domain** | Solar position, sunset windows, atmospheric feature engineering, palettes, vibrancy, confidence |
 | **Data layer** | PostgreSQL records, Redis cache and RQ jobs, local/S3-compatible private image storage |
@@ -129,8 +129,8 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 ```text
 afterglow/
 ├── apps/web/                  # Next.js App Router experience
-├── services/site-worker/      # Public Site runtime + protected AI endpoint
-├── scripts/                   # Site build, preview, and AI smoke checks
+├── services/site-worker/      # Hosted forecast API, D1 snapshots, and optional AI
+├── scripts/                   # Site build, preview, and production smoke checks
 ├── services/api/              # FastAPI modular monolith + migrations
 ├── services/worker/           # Redis/RQ background jobs
 ├── ml/
@@ -202,7 +202,7 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
 | `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-The hosted worker uses [Open-Meteo](https://open-meteo.com/) first and switches to [7Timer](https://www.7timer.info/) for live NOAA GFS forecasts when Open-Meteo is unavailable. The backup uses three-hour weather samples and omits visibility and rain probability. City search can also use a bundled index adapted from [GeoNames](https://www.geonames.org/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Neither weather feed requires an API key for Afterglow. The optional OpenAI key is a protected runtime secret. AI photo readings consume OpenAI API usage.
+The hosted `/api/v1/forecast/weekly` endpoint calculates the palette, vibrancy, and viewing window. It validates [Open-Meteo](https://open-meteo.com/) weather and tries [7Timer](https://www.7timer.info/) when the first source is unavailable or incomplete. The backup uses three-hour samples and omits visibility and rain probability. If both feeds fail, the worker can return the last valid forecast for the same city and local day from D1, with its original retrieval time, for up to 12 hours. City search can use a bundled index adapted from [GeoNames](https://www.geonames.org/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The optional OpenAI key is a protected runtime secret. AI photo readings consume OpenAI API usage.
 
 ## API surface
 
@@ -236,7 +236,12 @@ pnpm --dir apps/web test:e2e
 k6 run tests/load/forecast.js
 ```
 
-The checked-in suite covers solar calculations, prediction behavior, confidence decay, JSON-safe feature snapshots, palette extraction, API validation, and multipart observation evaluation. CI repeats the Python tests, Alembic migration, frontend tests, and production build.
+CI checks the Python API and migration, then builds the hosted Worker and runs the web, storage, and browser tests against that build. The production smoke check opens a real city share link and checks the rendered sunset and forecast's local date.
+
+```bash
+pnpm --dir apps/web exec playwright install chromium
+pnpm smoke:forecast
+```
 
 ## ML contract
 
@@ -257,7 +262,7 @@ See the complete [evaluation contract](./ml/evaluation/README.md).
 - Ordinary weather forecasts do not fully observe aerosols, smoke layers, terrain obstruction, or localized marine layers.
 - Camera exposure, white balance, HDR, editing, crop, and foreground pixels affect observed-color evaluation.
 - The current CIE76 nearest-palette comparison is product feedback, not a scientific accuracy claim.
-- The public deployment uses a Site worker for weather retrieval, failover, caching, and optional AI analysis. The full local/AWS architecture adds durable snapshots, queues, caching, and object storage.
+- The public worker stores short-lived weather snapshots for outage recovery. The full local/AWS architecture also stores prediction evaluations and supports queues and private object storage.
 - AI sky readings are visual interpretations, not measurements of aerosols, pollution, or safety-critical weather conditions.
 
 ## Roadmap

@@ -1,5 +1,6 @@
 import type { AiSkyReading, Evaluation, Forecast, Location, WeeklyForecast } from "./types";
 import type { Locale } from "@/components/locale-provider";
+import { defaultForecastPalette, forecastFromWeather, forecastLocalDate } from "./forecast-core.mjs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const WEATHER_PROXY = (process.env.NEXT_PUBLIC_WEATHER_PROXY || "").replace(/\/+$/, "");
@@ -89,27 +90,44 @@ function writeForecastCache(entry: CachedForecast) {
 export async function getWeeklyForecast(location: Location): Promise<WeeklyForecast> {
   const key = locationQuery(location);
   try {
-    const forecast = API_URL
-      ? await request<WeeklyForecast>(`/api/v1/forecast/weekly?${key}`)
+    const forecast = API_URL || WEATHER_PROXY
+      ? await request<WeeklyForecast>(`/api/v1/forecast/weekly?${key}`, { signal: AbortSignal.timeout(13_000) })
       : await getOpenMeteoWeekly(location);
-    const fetchedAt = Date.now();
-    if (forecast.days[0]?.date !== localDate(fetchedAt, location.timezone)) {
+    const now = Date.now();
+    const fetchedAt = forecast.freshness ? Date.parse(forecast.freshness.fetched_at) : now;
+    if (!Number.isFinite(fetchedAt) || forecast.days[0]?.date !== forecastLocalDate(now, location.timezone)) {
       throw new Error("Tonight’s forecast is temporarily unavailable.");
     }
+    if (forecast.freshness?.source === "cache" && (now - fetchedAt >= FORECAST_CACHE_MAX_AGE)) {
+      throw new Error("Tonight’s saved forecast has expired.");
+    }
+    const freshness = forecast.freshness ?? { source: "live" as const, fetched_at: new Date(fetchedAt).toISOString() };
+    if (freshness.source === "cache") {
+      const previouslySaved = findSavedForecast(key, now, location.timezone);
+      if (previouslySaved && previouslySaved.fetchedAt > fetchedAt) return asSavedForecast(previouslySaved);
+    }
     writeForecastCache({ key, fetchedAt, forecast });
-    return { ...forecast, freshness: { source: "live", fetched_at: new Date(fetchedAt).toISOString() } };
+    return { ...forecast, freshness };
   } catch (error) {
-    const now = Date.now();
-    const cached = readForecastCache().find((entry) =>
-      entry?.key === key &&
-      Number.isFinite(entry.fetchedAt) &&
-      entry.fetchedAt <= now &&
-      now - entry.fetchedAt < FORECAST_CACHE_MAX_AGE &&
-      entry.forecast?.days?.[0]?.date === localDate(now, location.timezone),
-    );
+    const cached = findSavedForecast(key, Date.now(), location.timezone);
     if (!cached) throw error;
-    return { ...cached.forecast, freshness: { source: "cache", fetched_at: new Date(cached.fetchedAt).toISOString() } };
+    return asSavedForecast(cached);
   }
+}
+
+function findSavedForecast(key: string, now: number, timezone: string): CachedForecast | undefined {
+  const today = forecastLocalDate(now, timezone);
+  return readForecastCache().find((entry) =>
+    entry?.key === key &&
+    Number.isFinite(entry.fetchedAt) &&
+    entry.fetchedAt <= now &&
+    now - entry.fetchedAt < FORECAST_CACHE_MAX_AGE &&
+    entry.forecast?.days?.[0]?.date === today,
+  );
+}
+
+function asSavedForecast(cached: CachedForecast): WeeklyForecast {
+  return { ...cached.forecast, freshness: { source: "cache", fetched_at: new Date(cached.fetchedAt).toISOString() } };
 }
 
 export function uploadObservation(predictionId: string, photo: File): Promise<Evaluation> {
@@ -161,18 +179,6 @@ export async function analyzeSunsetWithAI(forecast: Forecast, photo: File, local
   return payload as AiSkyReading;
 }
 
-const PALETTES = {
-  clear: ["#F8D6AE", "#F4B184", "#E88772", "#B9798D", "#6F6A9B"],
-  dramatic: ["#F9C58B", "#F08B6E", "#CF6683", "#8E638F", "#4C5278"],
-  soft: ["#F0D3BE", "#E6B4B1", "#C99BB5", "#9A8FB2", "#777A9B"],
-  muted: ["#D9CFBF", "#C9B4AA", "#A89DA4", "#84858E", "#666D78"],
-};
-
-type OpenMeteoPayload = {
-  hourly: Record<string, Array<number | null>>;
-  daily: { sunset: Array<number | null> };
-};
-
 async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<Location[]> {
   const params = new URLSearchParams({ name: query, count: "8", language: locale, format: "json" });
   const response = await fetchWeather(`/geocoding?${params}`, `https://geocoding-api.open-meteo.com/v1/search?${params}`, 3_000);
@@ -184,82 +190,14 @@ async function searchOpenMeteoLocations(query: string, locale: Locale): Promise<
   }));
 }
 
-function clock(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(date);
-}
-
-function localDate(time: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    year: "numeric", month: "2-digit", day: "2-digit", timeZone,
-  }).formatToParts(time);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
-  return `${value("year")}-${value("month")}-${value("day")}`;
-}
-
-function hexId(input: string): string {
-  let hash = 2166136261;
-  for (let i = 0; i < input.length; i += 1) hash = Math.imul(hash ^ input.charCodeAt(i), 16777619);
-  return `web-${(hash >>> 0).toString(16)}-${input.slice(0, 10).replaceAll("-", "")}`;
-}
-
-function at(payload: OpenMeteoPayload, field: string, index: number): number | null {
-  const raw = payload.hourly[field]?.[index];
-  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
-}
-
 async function getOpenMeteoWeekly(location: Location): Promise<WeeklyForecast> {
   const variables = ["cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "relative_humidity_2m", "visibility", "precipitation_probability"];
   const params = new URLSearchParams({ latitude: String(location.latitude), longitude: String(location.longitude), timezone: location.timezone, forecast_days: "7", hourly: variables.join(","), daily: "sunset", timeformat: "unixtime" });
   const response = await fetchWeather(`/forecast?${params}`, `https://api.open-meteo.com/v1/forecast?${params}`);
   if (!response.ok) throw new Error("The atmosphere is temporarily out of reach.");
-  const weatherSource = response.headers.get("x-afterglow-weather-source") === "7timer" ? "7timer" : "open-meteo";
-  const payload = await response.json() as OpenMeteoPayload;
-  const hourlyTimes = payload.hourly.time;
-  const sunsets = payload.daily.sunset.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  if (!hourlyTimes.length || !sunsets.length) throw new Error("Tonight’s forecast is temporarily unavailable.");
-  const distance = (time: number | null, sunset: number) => time === null ? Infinity : Math.abs(time - sunset);
-  const days = sunsets.flatMap((sunsetValue): Forecast[] => {
-    const sunset = new Date(sunsetValue * 1000);
-    let index = 0;
-    for (let i = 1; i < hourlyTimes.length; i += 1) {
-      if (distance(hourlyTimes[i], sunsetValue) < distance(hourlyTimes[index], sunsetValue)) index = i;
-    }
-    const cloud = at(payload, "cloud_cover", index);
-    if (cloud === null || (weatherSource === "7timer" && distance(hourlyTimes[index], sunsetValue) > 3 * 3600)) return [];
-    const low = at(payload, "cloud_cover_low", index);
-    const mid = at(payload, "cloud_cover_mid", index);
-    const high = at(payload, "cloud_cover_high", index);
-    const humidity = at(payload, "relative_humidity_2m", index);
-    const visibility = at(payload, "visibility", index);
-    const visibilityKm = visibility === null ? null : visibility / 1000;
-    const rain = at(payload, "precipitation_probability", index);
-    const illuminatedClouds = mid === null || high === null ? cloud : (high + mid) / 2;
-    const illumination = 1 - Math.min(1, Math.abs(illuminatedClouds - 48) / 55);
-    const clearHorizon = Math.max(0, 1 - (low ?? cloud) / 92);
-    const visibilityBonus = visibilityKm === null ? 0 : Math.min(12, Math.max(-8, (visibilityKm - 10) * 0.6));
-    const horizon = Math.max(0, (sunset.getTime() - Date.now()) / 3_600_000);
-    const rainPenalty = (rain ?? 0) * .22;
-    const humidityPenalty = humidity === null ? 0 : Math.max(0, (humidity - 72) * .32);
-    const vibrancy = Math.max(8, Math.min(98, Math.round(28 + 42 * illumination + 28 * clearHorizon + visibilityBonus - humidityPenalty - rainPenalty)));
-    const baselineConfidence = weatherSource === "7timer" ? 80 : 94;
-    const confidence = Math.max(38, Math.round(baselineConfidence - Math.min(32, Math.max(0, horizon - 12) * .18) - Math.min(12, (rain ?? 0) * .08)));
-    let palette = PALETTES.soft, dominant = ["Peach", "Rose", "Lavender"], summary = "Soft color with a gentle, lingering afterglow.";
-    if ((low ?? cloud) > 78 || (rain ?? 0) > 72) { palette = PALETTES.muted; dominant = ["Pewter", "Mauve", "Slate"]; summary = "Quiet color behind a soft, clouded horizon."; }
-    else if (high !== null && mid !== null && high + mid > 85 && clearHorizon > .45) { palette = PALETTES.dramatic; dominant = ["Amber", "Rose", "Plum"]; summary = "A layered sky with a strong chance of dramatic color."; }
-    else if (cloud < 22) { palette = PALETTES.clear; dominant = ["Apricot", "Coral", "Violet"]; summary = "A clean horizon, warm at first and violet after."; }
-    const start = new Date(sunset.getTime() - 24 * 60_000), end = new Date(sunset.getTime() + 22 * 60_000);
-    return [{
-      prediction_id: hexId(`${location.latitude}-${location.longitude}-${sunsetValue}`), model_kind: "heuristic", location,
-      date: localDate(sunset.getTime(), location.timezone), sunset_at: sunset.toISOString(), sunset_display: clock(sunset, location.timezone),
-      best_window_start: start.toISOString(), best_window_end: end.toISOString(), best_window_display: `${clock(start, location.timezone)}–${clock(end, location.timezone)}`,
-      palette, dominant_colors: dominant, vibrancy, confidence, summary, interpretation_label: "Forecast interpretation",
-      atmosphere: { cloud_cover: Math.round(cloud), low_clouds: low, mid_clouds: mid, high_clouds: high, humidity, visibility_km: visibilityKm === null ? null : Math.round(visibilityKm * 10) / 10, precipitation_probability: rain },
-      forecast_horizon_hours: horizon,
-    }];
-  });
-  if (!days.length) throw new Error("Tonight’s forecast is temporarily unavailable.");
-  const best = days.reduce((left, right) => right.vibrancy > left.vibrancy ? right : left);
-  return { location, best_prediction_id: best.prediction_id, days, weather_source: weatherSource };
+  const forecast = forecastFromWeather(location, await response.json(), "open-meteo");
+  if (!forecast) throw new Error("Tonight’s forecast is temporarily unavailable.");
+  return forecast;
 }
 
 const savedPalettes = new Map<string, string[]>();
@@ -283,7 +221,7 @@ async function evaluateInBrowser(predictionId: string, photo: File): Promise<Eva
   }
   const observed = [...buckets.values()].sort((a, b) => b.count - a.count).slice(0, 5).map(({count, r, g, b}) => `#${[r/count, g/count, b/count].map(value => Math.round(value).toString(16).padStart(2, "0")).join("").toUpperCase()}`);
   while (observed.length < 5) observed.push(observed.at(-1) ?? "#888888");
-  const forecast = savedPalettes.get(predictionId) ?? PALETTES.soft;
+  const forecast = savedPalettes.get(predictionId) ?? [...defaultForecastPalette];
   const rgb = (hex: string) => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
   const differences = forecast.map(color => Math.min(...observed.map(actual => Math.sqrt(rgb(color).reduce((sum, value, index) => sum + (value - rgb(actual)[index]) ** 2, 0)))) / 4.42);
   const mean = differences.reduce((sum, value) => sum + value, 0) / differences.length;

@@ -5,8 +5,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const staticRoot = path.join(root, "apps", "web", "out");
 const runtimePath = path.join(root, "services", "site-worker", "runtime.mjs");
-const fallbackPath = path.join(root, "services", "site-worker", "seven-timer.mjs");
 const outputPath = path.join(root, "dist", "server", "index.js");
+const runtimeModules = [
+  ["services/site-worker/seven-timer.mjs", 'import { fetchSevenTimerForecast } from "./seven-timer.mjs";'],
+  ["services/site-worker/forecast-store.mjs", 'import { readForecastSnapshot, saveForecastSnapshot } from "./forecast-store.mjs";'],
+  ["apps/web/lib/forecast-core.mjs", 'import { forecastFromWeather, forecastLocalDate, forecastWeatherFields } from "../../apps/web/lib/forecast-core.mjs";'],
+];
 
 async function filesIn(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -30,11 +34,16 @@ for (const filePath of await filesIn(staticRoot)) {
   assets[key] = { body: (await readFile(filePath)).toString("base64"), type: mimeType(filePath) };
 }
 
-const [runtime, fallback] = await Promise.all([readFile(runtimePath, "utf8"), readFile(fallbackPath, "utf8")]);
+const [runtime, ...modules] = await Promise.all([
+  readFile(runtimePath, "utf8"),
+  ...runtimeModules.map(([name]) => readFile(path.join(root, name), "utf8")),
+]);
 const marker = "export default createWorker({});";
-const fallbackImport = 'import { fetchSevenTimerForecast } from "./seven-timer.mjs";';
-if (!runtime.includes(marker) || !runtime.includes(fallbackImport)) throw new Error("Worker runtime markers were not found.");
-const bundled = `const ASSETS = ${JSON.stringify(assets)};\n${fallback}\n${runtime.replace(fallbackImport, "").replace(marker, "export default createWorker(ASSETS);")}`;
+if (!runtime.includes(marker) || runtimeModules.some(([, importLine]) => !runtime.includes(importLine))) {
+  throw new Error("Worker runtime markers were not found.");
+}
+const bundledRuntime = runtimeModules.reduce((source, [, importLine]) => source.replace(importLine, ""), runtime);
+const bundled = `const ASSETS = ${JSON.stringify(assets)};\n${modules.join("\n")}\n${bundledRuntime.replace(marker, "export default createWorker(ASSETS);")}`;
 await mkdir(path.dirname(outputPath), { recursive: true });
 await writeFile(outputPath, bundled);
 console.log(`Built site worker with ${Object.keys(assets).length} assets.`);

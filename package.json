@@ -8,8 +8,9 @@
     "build:site": "cross-env STATIC_EXPORT=1 NEXT_PUBLIC_API_URL= NEXT_PUBLIC_WEATHER_PROXY=/api/weather NEXT_PUBLIC_SITE_URL=https://afterglow.jonzhang.dev pnpm --dir apps/web build && node scripts/build-site-worker.mjs",
     "preview:site": "node --env-file=.env.local scripts/serve-site-worker.mjs",
     "smoke:ai": "node --env-file=.env.local scripts/smoke-ai.mjs",
+    "smoke:forecast": "node scripts/smoke-forecast.mjs",
     "test:web": "pnpm --dir apps/web test",
-    "test:worker": "node --test tests/site-worker.test.mjs tests/seven-timer.test.mjs",
+    "test:worker": "node --test tests/site-worker.test.mjs tests/seven-timer.test.mjs tests/forecast-store.test.mjs",
     "test": "pnpm test:web && pnpm test:worker"
   },
   "devDependencies": {

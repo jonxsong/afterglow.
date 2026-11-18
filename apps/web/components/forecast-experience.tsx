@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { analyzeSunsetWithAI, getWeeklyForecast, rememberForecastPalette, uploadObservation } from "@/lib/api";
 import { readForecastShareLocation } from "@/lib/forecast-share";
+import { forecastLocalDate } from "@/lib/forecast-core.mjs";
 import type { AiSkyReading, Evaluation, Location } from "@/lib/types";
 import { ForecastShareButton } from "./forecast-share-button";
 import { LocationSearch } from "./location-search";
@@ -22,6 +23,19 @@ const DEFAULT_LOCATION: Location = {
 };
 
 const EXAMPLE_PALETTE = ["#F7D4AA", "#EEAD7E", "#DA7E7A", "#A66F92", "#665E8B"];
+
+function untilCityMidnight(now: number, timezone: string) {
+  const today = forecastLocalDate(now, timezone);
+  let before = now;
+  let after = now + 27 * 60 * 60 * 1000;
+  // Find the next calendar boundary without assuming every local day is 24 hours.
+  while (after - before > 1000) {
+    const middle = Math.floor((before + after) / 2);
+    if (forecastLocalDate(middle, timezone) === today) before = middle;
+    else after = middle;
+  }
+  return after - now;
+}
 
 function focusPreviewHeading(element: HTMLHeadingElement | null) {
   element?.focus({ preventScroll: true });
@@ -77,17 +91,19 @@ function localError(message: string, locale: Locale, t: (key: CopyKey) => string
 export function ForecastExperience() {
   const { locale, t } = useLocale();
   const [location, setLocation] = useState<Location>(DEFAULT_LOCATION);
-  const [locationReady, setLocationReady] = useState(false);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
   const [recent, setRecent] = useState<Location[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [aiReading, setAiReading] = useState<AiSkyReading | null>(null);
   const [showSample, setShowSample] = useState(false);
+  const locationReady = observedAt !== null;
+  const forecastDay = observedAt === null ? null : forecastLocalDate(observedAt, location.timezone);
 
   useEffect(() => {
     const sharedLocation = readForecastShareLocation(window.location.search);
     if (sharedLocation) setLocation(sharedLocation);
-    setLocationReady(true);
+    setObservedAt(Date.now());
     try {
       const saved = window.localStorage.getItem("afterglow:recent");
       if (saved) {
@@ -97,8 +113,28 @@ export function ForecastExperience() {
     } catch { /* Recent locations are optional. */ }
   }, []);
 
+  useEffect(() => {
+    if (!locationReady) return;
+    let timer: number;
+    const refreshDate = () => {
+      window.clearTimeout(timer);
+      const now = Date.now();
+      setObservedAt(now);
+      timer = window.setTimeout(refreshDate, untilCityMidnight(now, location.timezone));
+    };
+    refreshDate();
+    window.addEventListener("pageshow", refreshDate);
+    document.addEventListener("visibilitychange", refreshDate);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", refreshDate);
+      document.removeEventListener("visibilitychange", refreshDate);
+    };
+  }, [location.timezone, locationReady]);
+
   function selectLocation(next: Location) {
     setLocation(next);
+    setObservedAt(Date.now());
     setShowSample(false);
     setEvaluation(null);
     setSelectedPhoto(null);
@@ -109,16 +145,19 @@ export function ForecastExperience() {
   }
 
   const forecast = useQuery({
-    queryKey: ["weekly-forecast", location.latitude, location.longitude, location.timezone],
+    queryKey: ["weekly-forecast", location.latitude, location.longitude, location.timezone, forecastDay],
     queryFn: () => getWeeklyForecast(location),
     enabled: locationReady,
+    refetchOnWindowFocus: true,
     retry: false,
   });
   const upload = useMutation({
     mutationFn: ({ predictionId, file }: { predictionId: string; file: File }) => uploadObservation(predictionId, file),
     onSuccess: setEvaluation,
   });
-  const tonight = forecast.data?.days[0];
+  const currentDay = forecast.data?.days[0];
+  const tonight = currentDay?.date === forecastDay ? currentDay : undefined;
+  const currentEvaluation = evaluation?.prediction_id === tonight?.prediction_id ? evaluation : null;
   const weatherSource = forecast.data?.weather_source;
   const backupWeather = weatherSource === "7timer";
   const liveUnavailable = Boolean(forecast.error && !tonight);
@@ -159,7 +198,7 @@ export function ForecastExperience() {
           />
         </div>
       </div>
-      <AnimatePresence mode="wait">
+      <AnimatePresence key={`${location.latitude}:${location.longitude}:${forecastDay}`} mode="wait">
         {(!locationReady || forecast.isLoading) && !previewing && (
           <motion.div key="loading" className="forecast-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="loading-sky" aria-hidden /><p role="status">{t("loading")}</p>
@@ -251,14 +290,14 @@ export function ForecastExperience() {
                 {upload.isPending ? <><span className="spinner" /><strong>{t("readingColors")}</strong></> : <><Upload /><strong>{t("choosePhoto")}</strong><span>{t("photoRequirements")}</span></>}
               </label>
               {upload.error && <p className="upload-error">{localError(upload.error.message, locale, t)}</p>}
-              {evaluation && (
+              {currentEvaluation && (
                 <motion.div className="evaluation" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                  <Check /><div><p>{t("comparison")}</p><strong>{evaluation.palette_accuracy}% {t("paletteSimilarity")}</strong><span>{t("meanDifference")}: {evaluation.mean_delta_e} ΔE</span></div>
-                  <div><small>{t("forecast")}</small><Palette colors={evaluation.forecast_palette} label={t("paletteLabel")} small /></div>
-                  <div><small>{t("observed")}</small><Palette colors={evaluation.observed_palette} label={t("paletteLabel")} small /></div>
+                  <Check /><div><p>{t("comparison")}</p><strong>{currentEvaluation.palette_accuracy}% {t("paletteSimilarity")}</strong><span>{t("meanDifference")}: {currentEvaluation.mean_delta_e} ΔE</span></div>
+                  <div><small>{t("forecast")}</small><Palette colors={currentEvaluation.forecast_palette} label={t("paletteLabel")} small /></div>
+                  <div><small>{t("observed")}</small><Palette colors={currentEvaluation.observed_palette} label={t("paletteLabel")} small /></div>
                 </motion.div>
               )}
-              {evaluation && selectedPhoto && (
+              {currentEvaluation && selectedPhoto && (
                 <div className="ai-invitation">
                   <div><span><Sparkles size={15} /> {t("aiEyebrow")}</span><h4>{t("aiTitle")}</h4><p>{t("aiDisclosure")}</p></div>
                   <button type="button" disabled={aiAnalysis.isPending} onClick={() => aiAnalysis.mutate({ photo: selectedPhoto })}>
@@ -267,7 +306,7 @@ export function ForecastExperience() {
                 </div>
               )}
               {aiAnalysis.error && <p className="ai-error">{t("aiError")}</p>}
-              {aiReading && (
+              {currentEvaluation && aiReading && (
                 <motion.article className="ai-reading" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                   <header><div><span>{t("aiPowered")}</span><h4>{aiReading.title}</h4><p>{aiReading.observed_mood}</p></div><div className="ai-match"><strong>{aiReading.match_score}</strong><span>{t("aiMatchScore")}</span></div></header>
                   <div className="ai-reading-grid">

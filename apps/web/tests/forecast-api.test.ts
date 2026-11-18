@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Location } from "@/lib/types";
+import { forecastFromWeather } from "@/lib/forecast-core.mjs";
+import type { Location, WeeklyForecast } from "@/lib/types";
 
 const tokyo: Location = {
   name: "Tokyo", country: "Japan", latitude: 35.6762, longitude: 139.6503, timezone: "Asia/Tokyo",
@@ -7,12 +8,18 @@ const tokyo: Location = {
 const retrievedAt = "2026-11-17T00:00:00.000Z";
 const sunsetAt = "2026-11-17T07:32:00.000Z";
 
-function providerForecast() {
+function weather() {
   const sunset = Date.parse(sunsetAt) / 1000;
-  return Response.json({
+  return {
     hourly: { time: [sunset - 45 * 60, sunset + 15 * 60], cloud_cover: [12, 48] },
     daily: { sunset: [sunset] },
-  });
+  };
+}
+
+function serverForecast(source: "open-meteo" | "7timer" = "open-meteo", freshness?: WeeklyForecast["freshness"]) {
+  const forecast = forecastFromWeather(tokyo, weather(), source, Date.parse(retrievedAt));
+  if (!forecast) throw new Error("Invalid test forecast");
+  return Response.json({ ...forecast, freshness });
 }
 
 beforeEach(() => {
@@ -32,10 +39,7 @@ afterEach(() => {
 
 describe("the hosted weather forecast", () => {
   it("uses the backup weather response directly and preserves its missing metrics", async () => {
-    const fetch = vi.fn(async () => {
-      const payload = await providerForecast().json();
-      return Response.json(payload, { headers: { "x-afterglow-weather-source": "7timer" } });
-    });
+    const fetch = vi.fn(() => Promise.resolve(serverForecast("7timer")));
     vi.stubGlobal("fetch", fetch);
     const { getWeeklyForecast } = await import("@/lib/api");
     const forecast = await getWeeklyForecast(tokyo);
@@ -44,20 +48,30 @@ describe("the hosted weather forecast", () => {
     expect(forecast.days[0].atmosphere).toMatchObject({ cloud_cover: 48, visibility_km: null, precipitation_probability: null });
   });
 
-  it("uses the direct provider when the relay is limited and formats the sunset in Tokyo", async () => {
-    const fetch = vi.fn((url: string) =>
-      Promise.resolve(url.startsWith("/api/") ? new Response(null, { status: 429 }) : providerForecast()),
-    );
+  it("uses the shared API and keeps the saved weather timestamp for a first-time visitor", async () => {
+    const fetch = vi.fn((url: string) => Promise.resolve(serverForecast("7timer", { source: "cache", fetched_at: retrievedAt })));
+    vi.stubGlobal("fetch", fetch);
+    const { getWeeklyForecast } = await import("@/lib/api");
+
+    vi.setSystemTime(new Date("2026-11-17T06:30:00.000Z"));
+    const forecast = await getWeeklyForecast(tokyo);
+    expect(fetch.mock.calls.map(([url]) => url.split("?")[0])).toEqual(["/api/v1/forecast/weekly"]);
+    expect(forecast.freshness).toEqual({ source: "cache", fetched_at: retrievedAt });
+    expect(forecast.days[0].sunset_display).toBe("4:32 PM");
+  });
+
+  it("uses the same calculation for direct Open-Meteo in standalone development", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WEATHER_PROXY", "");
+    const fetch = vi.fn((url: string) => Promise.resolve(Response.json(weather())));
     vi.stubGlobal("fetch", fetch);
     const { getWeeklyForecast } = await import("@/lib/api");
 
     const forecast = await getWeeklyForecast(tokyo);
 
     expect(fetch.mock.calls.map(([url]) => url.split("?")[0])).toEqual([
-      "/api/weather/forecast",
       "https://api.open-meteo.com/v1/forecast",
     ]);
-    expect(fetch.mock.calls[1][0]).toContain("timeformat=unixtime");
+    expect(fetch.mock.calls[0][0]).toContain("timeformat=unixtime");
     expect(forecast.freshness).toEqual({ source: "live", fetched_at: retrievedAt });
     expect(forecast.days[0]).toMatchObject({
       date: "2026-11-17",
@@ -68,8 +82,8 @@ describe("the hosted weather forecast", () => {
   });
 
   it("restores that location's saved forecast when both live routes fail and expires it after 12 hours", async () => {
-    const fetch = vi.fn().mockImplementationOnce(providerForecast).mockImplementation(() =>
-      Promise.resolve(new Response(null, { status: 429 })),
+    const fetch = vi.fn().mockResolvedValueOnce(serverForecast()).mockImplementation(() =>
+      Promise.resolve(Response.json({ error: { message: "The atmosphere is temporarily out of reach." } }, { status: 503 })),
     );
     vi.stubGlobal("fetch", fetch);
     const { getWeeklyForecast } = await import("@/lib/api");
@@ -86,8 +100,8 @@ describe("the hosted weather forecast", () => {
   });
 
   it("never uses yesterday's forecast after midnight in the selected location", async () => {
-    const fetch = vi.fn().mockImplementationOnce(providerForecast).mockImplementation(() =>
-      Promise.resolve(new Response(null, { status: 503 })),
+    const fetch = vi.fn().mockResolvedValueOnce(serverForecast()).mockImplementation(() =>
+      Promise.resolve(Response.json({ error: { message: "The atmosphere is temporarily out of reach." } }, { status: 503 })),
     );
     vi.stubGlobal("fetch", fetch);
     const { getWeeklyForecast } = await import("@/lib/api");

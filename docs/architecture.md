@@ -2,7 +2,7 @@
 
 Afterglow has two delivery profiles around the same forecast concepts. The public Site
 uses a statically exported Next.js application and a lightweight server worker. The worker
-proxies and briefly caches live weather from Open-Meteo or 7Timer. The browser computes the heuristic forecast, renders the interactive sky, and
+validates live weather from Open-Meteo or 7Timer and computes the heuristic forecast. The browser renders the interactive sky and
 performs the first photo color comparison locally. The worker serves the application and
 protects the optional OpenAI vision endpoint.
 
@@ -28,10 +28,12 @@ dataset exists and a leakage-safe evaluation shows improvement.
 
 ## Public Site and AI reading
 
-The public `afterglow.jonzhang.dev` build fetches weather through a same-origin worker. The worker
-uses 7Timer's live NOAA GFS feed on Open-Meteo failures, backs off on rate limits, and caches
-successful forecasts by city coordinates, time zone, and local date. The client can use a bundled
-GeoNames city index if geocoding fails and a recent same-day saved forecast if both live feeds fail.
+The public `afterglow.jonzhang.dev` build reads `/api/v1/forecast/weekly`, a versioned Worker API
+that returns the palette, vibrancy, and viewing window. It uses 7Timer's live NOAA GFS feed when
+Open-Meteo is unavailable or incomplete. The worker saves validated weather by rounded coordinates,
+time zone, and local date in D1, without saving display labels. If live weather fails, the API can
+return a same-day snapshot up to 12 hours old and identify its original retrieval time. The client
+updates the date at the selected city's midnight and uses a bundled GeoNames index if geocoding fails.
 The Site worker also serves the exported Next.js assets and exposes the protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
 comparison locally. Only after the visitor explicitly requests an AI reading does it resize
 the photograph and send that copy to the worker. The worker validates the payload, applies
