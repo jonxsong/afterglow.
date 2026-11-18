@@ -77,3 +77,16 @@ jobs:
           name: Afterglow-XCTest
           path: ${{ runner.temp }}/Afterglow.xcresult
           if-no-files-found: ignore
+      - name: Export native simulator screenshots
+        if: ${{ success() }}
+        run: |
+          xcrun xcresulttool export attachments \
+            --path "$RUNNER_TEMP/Afterglow.xcresult" \
+            --output-path "$RUNNER_TEMP/Afterglow-Screenshots"
+      - name: Upload native simulator screenshots
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Afterglow-Screenshots
+          path: ${{ runner.temp }}/Afterglow-Screenshots/
+          if-no-files-found: error
