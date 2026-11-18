@@ -105,6 +105,7 @@ struct ForecastView: View {
                 Text(day.bestWindowDisplay)
                     .font(.system(.title2, design: .serif))
                 ForecastPaletteStrip(palette: day.palette)
+                    .accessibilityValue(Text(day.dominantColors.joined(separator: ", ")))
                 if !day.summary.isEmpty {
                     Text(day.summary)
                         .font(.callout)
@@ -125,6 +126,7 @@ struct ForecastView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(SkyTheme.rose)
+            .accessibilityIdentifier("forecast.compare")
         }
     }
 

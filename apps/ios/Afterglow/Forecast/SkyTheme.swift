@@ -32,6 +32,7 @@ struct ForecastPaletteStrip: View {
         }
         .frame(height: 10)
         .clipShape(.capsule)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Predicted sunset palette")
     }
 }

@@ -137,6 +137,7 @@ struct LocationOnboardingView<City: Identifiable>: View {
                     .submitLabel(.search)
                     .focused($cityFieldFocused)
                     .accessibilityLabel("Search by city")
+                    .accessibilityIdentifier("location.search")
 
                 if !cityQuery.isEmpty {
                     Button {
@@ -191,6 +192,7 @@ struct LocationOnboardingView<City: Identifiable>: View {
                             cityRow(city)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("location.city-result")
                     }
                 }
                 .background(panel, in: RoundedRectangle(cornerRadius: 16))
@@ -278,6 +280,7 @@ struct LocationOnboardingView<City: Identifiable>: View {
             .buttonStyle(.plain)
             .disabled(locationRequest != nil)
             .accessibilityHint("Uses your location to find a nearby forecast")
+            .accessibilityIdentifier("location.current")
 
             if let locationError {
                 Text(verbatim: locationError)
