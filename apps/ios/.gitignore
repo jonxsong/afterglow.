@@ -1,0 +1,9 @@
+Afterglow.xcodeproj/
+DerivedData/
+*.xcresult
+*.xcarchive
+*.ipa
+*.mobileprovision
+*.p12
+*.p8
+xcuserdata/
