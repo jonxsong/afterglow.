@@ -15,27 +15,27 @@ enum DeviceLocationError: LocalizedError, Sendable {
     }
 }
 
+private struct ApproximateDevicePoint: Sendable {
+    let latitude: Double
+    let longitude: Double
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = (coordinate.latitude * 100).rounded() / 100
+        longitude = (coordinate.longitude * 100).rounded() / 100
+    }
+
+    func place(named name: String = "Current location", region: String? = nil,
+               country: String = "", timezone: String) -> ForecastLocation {
+        ForecastLocation(name: name, region: region, country: country, latitude: latitude,
+                         longitude: longitude, timezone: timezone)
+    }
+}
+
 @MainActor
 final class DeviceLocationService: NSObject, CLLocationManagerDelegate {
     private struct PendingLocation {
         let id: UUID
         let continuation: CheckedContinuation<ForecastLocation, Error>
-    }
-
-    private struct ApproximatePoint: Sendable {
-        let latitude: Double
-        let longitude: Double
-
-        init(_ coordinate: CLLocationCoordinate2D) {
-            latitude = (coordinate.latitude * 100).rounded() / 100
-            longitude = (coordinate.longitude * 100).rounded() / 100
-        }
-
-        func place(named name: String = "Current location", region: String? = nil,
-                   country: String = "", timezone: String) -> ForecastLocation {
-            ForecastLocation(name: name, region: region, country: country, latitude: latitude,
-                             longitude: longitude, timezone: timezone)
-        }
     }
 
     private var pending: PendingLocation?
@@ -94,7 +94,7 @@ final class DeviceLocationService: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func resolveCity(near point: ApproximatePoint, id: UUID) {
+    private func resolveCity(near point: ApproximateDevicePoint, id: UUID) {
         stopLocationManager()
         let geocoder = CLGeocoder()
         self.geocoder = geocoder
@@ -162,7 +162,7 @@ final class DeviceLocationService: NSObject, CLLocationManagerDelegate {
         let point = locations.last(where: { location in
             location.horizontalAccuracy >= 0 && abs(location.timestamp.timeIntervalSinceNow) < 120
                 && CLLocationCoordinate2DIsValid(location.coordinate)
-        }).map { ApproximatePoint($0.coordinate) }
+        }).map { ApproximateDevicePoint($0.coordinate) }
 
         Task { @MainActor [weak self] in
             guard let self, let request = self.pending, self.ownsManager(identity) else { return }
