@@ -17,7 +17,7 @@ struct SunsetScene: View {
             let size = geometry.size
             let sunX = size.width * CGFloat(0.27 + 0.29 * progress)
             // A sunset-relative path keeps the disc on the horizon at local sunset.
-            let sunY = size.height * CGFloat(0.74 + minutesFromSunset * 0.009)
+            let sunY = size.height * CGFloat(0.68 + minutesFromSunset * 0.009)
             let glow = sky.first ?? SkyTheme.peach
 
             ZStack {
@@ -46,7 +46,7 @@ struct SunsetScene: View {
                     .opacity(1 - twilight)
 
                 Ridge(start: 0.78, middle: 0.68, end: 0.71)
-                    .fill(Color(red: 0.32, green: 0.22, blue: 0.34).opacity(0.74))
+                    .fill(Color(red: 0.45, green: 0.31, blue: 0.39))
                 Ridge(start: 0.86, middle: 0.75, end: 0.83)
                     .fill(SkyTheme.dusk)
             }
