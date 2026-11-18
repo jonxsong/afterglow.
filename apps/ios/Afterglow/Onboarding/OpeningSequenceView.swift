@@ -1,0 +1,220 @@
+import Foundation
+import SwiftUI
+
+/// A one-time introduction. The caller owns whether it should appear on launch.
+struct OpeningSequenceView: View {
+    var onFinish: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var startedAt = Date()
+    @State private var finished = false
+
+    private let duration = 1.55
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            GeometryReader { proxy in
+                TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || finished)) { timeline in
+                    let progress = reduceMotion ? 1 : min(1, max(0, timeline.date.timeIntervalSince(startedAt) / duration))
+                    scene(size: proxy.size, progress: progress)
+                }
+            }
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
+
+            Button("Skip", action: finish)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 44)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.trailing, 20)
+                .padding(.top, 8)
+                .accessibilityHint("Continues to Afterglow")
+        }
+        .task {
+            startedAt = Date()
+            do {
+                try await Task.sleep(for: .seconds(reduceMotion ? 0.2 : duration))
+                finish()
+            } catch is CancellationError {
+                // The user already skipped, or this view left the hierarchy.
+            } catch {
+                finish()
+            }
+        }
+    }
+
+    private func scene(size: CGSize, progress: Double) -> some View {
+        let resolve = introEase(progress, from: 0.63, to: 0.90)
+        let markOpacity = introEase(progress, from: 0.82, to: 0.94)
+        let wordmarkOpacity = introEase(progress, from: 0.77, to: 0.95)
+        let markSize = min(size.width * 0.24, 108)
+        let markCenter = CGPoint(x: size.width / 2, y: size.height * 0.44)
+
+        return ZStack {
+            Rectangle()
+                .fill(colorScheme == .dark
+                    ? IntroColor(0x211C27).color
+                    : IntroColor(0xF8F6F2).color)
+
+            OpeningSky(dayProgress: min(1, progress / 0.69), resolve: resolve)
+                .frame(
+                    width: introMix(size.width, markSize, resolve),
+                    height: introMix(size.height, markSize, resolve)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: markSize * 0.28 * resolve, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: markSize * 0.28 * resolve, style: .continuous)
+                        .strokeBorder(IntroColor(0x302B2D).color.opacity(resolve), lineWidth: 2)
+                }
+                .opacity(1 - markOpacity)
+                .position(
+                    x: markCenter.x,
+                    y: introMix(size.height / 2, markCenter.y, resolve)
+                )
+
+            Image("BrandMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: markSize, height: markSize)
+                .opacity(markOpacity)
+                .position(markCenter)
+
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(verbatim: "afterglow")
+                Text(verbatim: ".")
+                    .foregroundStyle(IntroColor(0xB87079).color)
+            }
+            .font(.system(.largeTitle, design: .serif).weight(.semibold))
+            .opacity(wordmarkOpacity)
+            .position(x: markCenter.x, y: markCenter.y + markSize / 2 + 35)
+        }
+    }
+
+    private func finish() {
+        guard !finished else { return }
+        finished = true
+        onFinish()
+    }
+}
+
+private struct OpeningSky: View {
+    let dayProgress: Double
+    let resolve: Double
+
+    private let dawn = IntroSky(zenith: 0x8E92BC, middle: 0xD9ACC0, horizon: 0xFFD2A0)
+    private let daylight = IntroSky(zenith: 0x7CAACF, middle: 0xBED9E7, horizon: 0xFBE4C2)
+    private let sunset = IntroSky(zenith: 0x766FA7, middle: 0xD58CA6, horizon: 0xF2B28D)
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let sky = dayProgress < 0.5
+                ? dawn.mixed(with: daylight, amount: dayProgress * 2)
+                : daylight.mixed(with: sunset, amount: (dayProgress - 0.5) * 2)
+            let sunX = introMix(0.18 + 0.61 * dayProgress, 0.5, resolve)
+            let sunY = introMix(0.73 - sin(dayProgress * .pi) * 0.51, 0.62, resolve)
+            let sunDiameter = min(size.width, size.height) * introMix(0.21, 0.30, resolve)
+
+            ZStack {
+                LinearGradient(colors: sky.colors, startPoint: .top, endPoint: .bottom)
+
+                Circle()
+                    .fill(IntroColor(0xFCE1B9).color)
+                    .frame(width: sunDiameter, height: sunDiameter)
+                    .shadow(color: IntroColor(0xFFD293).color.opacity(0.55 * (1 - resolve)), radius: sunDiameter * 0.46)
+                    .position(x: size.width * sunX, y: size.height * sunY)
+
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: size.height * 0.79))
+                    path.addCurve(
+                        to: CGPoint(x: size.width, y: size.height * 0.71),
+                        control1: CGPoint(x: size.width * 0.34, y: size.height * 0.65),
+                        control2: CGPoint(x: size.width * 0.62, y: size.height * 0.89)
+                    )
+                    path.addLine(to: CGPoint(x: size.width, y: size.height))
+                    path.addLine(to: CGPoint(x: 0, y: size.height))
+                    path.closeSubpath()
+                }
+                .fill(IntroColor(0x302B2D).color)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.08, y: size.height * 0.75))
+                    path.addCurve(
+                        to: CGPoint(x: size.width * 0.92, y: size.height * 0.73),
+                        control1: CGPoint(x: size.width * 0.41, y: size.height * 0.66),
+                        control2: CGPoint(x: size.width * 0.63, y: size.height * 0.82)
+                    )
+                }
+                .stroke(IntroColor(0xFFF8F0).color.opacity(0.65 * resolve), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            }
+        }
+    }
+}
+
+private struct IntroSky {
+    let zenith: IntroColor
+    let middle: IntroColor
+    let horizon: IntroColor
+
+    init(zenith: UInt32, middle: UInt32, horizon: UInt32) {
+        self.init(zenith: IntroColor(zenith), middle: IntroColor(middle), horizon: IntroColor(horizon))
+    }
+
+    private init(zenith: IntroColor, middle: IntroColor, horizon: IntroColor) {
+        self.zenith = zenith
+        self.middle = middle
+        self.horizon = horizon
+    }
+
+    var colors: [Color] { [zenith.color, middle.color, horizon.color] }
+
+    func mixed(with other: IntroSky, amount: Double) -> IntroSky {
+        IntroSky(
+            zenith: zenith.mixed(with: other.zenith, amount: amount),
+            middle: middle.mixed(with: other.middle, amount: amount),
+            horizon: horizon.mixed(with: other.horizon, amount: amount)
+        )
+    }
+}
+
+private struct IntroColor {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    init(_ hex: UInt32) {
+        self.init(
+            red: Double((hex >> 16) & 255) / 255,
+            green: Double((hex >> 8) & 255) / 255,
+            blue: Double(hex & 255) / 255
+        )
+    }
+
+    private init(red: Double, green: Double, blue: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+
+    var color: Color { Color(red: red, green: green, blue: blue) }
+
+    func mixed(with other: IntroColor, amount: Double) -> IntroColor {
+        IntroColor(
+            red: introMix(red, other.red, amount),
+            green: introMix(green, other.green, amount),
+            blue: introMix(blue, other.blue, amount)
+        )
+    }
+}
+
+private func introMix(_ start: Double, _ end: Double, _ amount: Double) -> Double {
+    start + (end - start) * amount
+}
+
+private func introEase(_ value: Double, from lower: Double, to upper: Double) -> Double {
+    let t = min(1, max(0, (value - lower) / (upper - lower)))
+    return t * t * (3 - 2 * t)
+}
