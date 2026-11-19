@@ -64,6 +64,16 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Afterglow.app/Contents/MacOS/Afterglow"
     dependencies:
       - target: AfterglowMac
+  AfterglowMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [AfterglowMacUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jonzhang.afterglow.macuitests
+    dependencies:
+      - target: AfterglowMac
   AfterglowTests:
     type: bundle.unit-test
     platform: iOS
@@ -96,4 +106,4 @@ schemes:
       targets:
         AfterglowMac: all
     test:
-      targets: [AfterglowMacTests]
+      targets: [AfterglowMacTests, AfterglowMacUITests]
