@@ -56,3 +56,7 @@ In the repository’s `apple-distribution` environment, restrict deployments to 
 | Secret | `ASC_PRIVATE_KEY` | Contents of the downloaded `.p8` file |
 
 Run **Upload signed Apple builds to TestFlight** from GitHub Actions. Check each build’s processing status in App Store Connect before assigning it to internal testers.
+
+## Enable the website download links
+
+After confirming a public listing opens in the App Store, set `NEXT_PUBLIC_IPHONE_APP_STORE_LIVE=1` for iPhone or `NEXT_PUBLIC_MAC_APP_STORE_LIVE=1` for Mac when building and deploying the website. Each flag replaces its platform’s **Coming soon** label with the official download badge and store link.
