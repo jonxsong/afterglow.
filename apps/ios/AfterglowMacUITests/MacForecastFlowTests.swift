@@ -47,9 +47,9 @@ final class MacForecastFlowTests: XCTestCase {
         // Query through the application so either presentation is covered.
         let open = app.buttons.matching(identifier: "Open").firstMatch
         XCTAssertTrue(open.waitForExistence(timeout: 8), "The native file picker did not open.")
-        let cancel = app.buttons.matching(identifier: "Cancel").firstMatch
-        XCTAssertTrue(cancel.wait(for: \.isHittable, toEqual: true, timeout: 5))
-        cancel.click()
+        // Open panels also expose a Cancel button in the Touch Bar. Escape
+        // dismisses the focused panel without relying on either button's placement.
+        app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(open.waitForNonExistence(timeout: 5))
         XCTAssertTrue(choosePhoto.wait(for: \.isHittable, toEqual: true, timeout: 5))
     }
