@@ -51,7 +51,11 @@ struct SunsetScene: View {
                     .fill(SkyTheme.dusk)
             }
         }
+        #if os(macOS)
+        .frame(height: 280)
+        #else
         .frame(height: 205)
+        #endif
         .clipShape(.rect(cornerRadius: 24))
         .accessibilityHidden(true)
     }

@@ -60,6 +60,9 @@ struct AfterglowRootView: View {
                     }
                 }
             }
+            #if os(macOS)
+            .frame(minWidth: 480, idealWidth: 540, minHeight: 360, idealHeight: 480)
+            #endif
         }
     }
 

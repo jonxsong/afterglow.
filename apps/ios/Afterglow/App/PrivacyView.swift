@@ -15,6 +15,8 @@ struct PrivacyView: View {
             }
         }
         .navigationTitle("Privacy")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }

@@ -22,8 +22,24 @@ struct AfterglowApp: App {
     }
 
     var body: some Scene {
+        #if os(macOS)
+        Window("Afterglow", id: "afterglow") {
+            AfterglowRootView(session: session, service: service, deviceLocation: deviceLocation)
+                .frame(minWidth: 440, minHeight: 460)
+        }
+        .defaultSize(width: 940, height: 740)
+        .windowResizability(.contentMinSize)
+        .commands {
+            CommandMenu("Forecast") {
+                Button("Refresh Forecast") { Task { await session.refresh() } }
+                    .keyboardShortcut("r")
+                    .disabled(session.location == nil || session.isLoading)
+            }
+        }
+        #else
         WindowGroup {
             AfterglowRootView(session: session, service: service, deviceLocation: deviceLocation)
         }
+        #endif
     }
 }

@@ -13,29 +13,27 @@ struct ForecastView: View {
     }
 
     var body: some View {
-        ScrollViewReader { scroll in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    masthead
-                    if let forecast = session.forecast, let day = forecastDay {
-                        reading(day, forecast: forecast)
-                            .id("current-reading")
-                        if forecast.days.count > 1 {
-                            WeeklyOutlook(forecast: forecast, selectedID: day.id) { chosen in
+        GeometryReader { viewport in
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        masthead
+                        if let forecast = session.forecast, let day = forecastDay {
+                            forecastLayout(forecast, day: day, width: viewport.size.width) { chosen in
                                 selectedID = chosen.id
                                 scroll.scrollTo("current-reading", anchor: .top)
                             }
+                        } else {
+                            unavailable
                         }
-                    } else {
-                        unavailable
                     }
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: maximumContentWidth)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 18)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity)
+                .refreshable { await session.refresh() }
             }
-            .refreshable { await session.refresh() }
         }
         .background(SkyTheme.background(for: scheme).ignoresSafeArea())
         .sheet(item: $comparingDay) { day in
@@ -53,6 +51,46 @@ struct ForecastView: View {
             }
         }
         .onChange(of: session.location?.id) { _, _ in selectedID = nil }
+    }
+
+    private var maximumContentWidth: CGFloat {
+        #if os(macOS)
+        960
+        #else
+        560
+        #endif
+    }
+
+    private func forecastLayout(
+        _ forecast: WeeklyForecast,
+        day: ForecastDay,
+        width: CGFloat,
+        selectDay: @escaping (ForecastDay) -> Void
+    ) -> some View {
+        #if os(macOS)
+        let sidebar = width >= 810 && forecast.days.count > 1
+        #else
+        let sidebar = false
+        #endif
+        let layout = sidebar
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: 28))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 22))
+
+        return layout {
+            reading(day, forecast: forecast)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .id("current-reading")
+            if forecast.days.count > 1 {
+                WeeklyOutlook(forecast: forecast, selectedID: day.id, selectDay: selectDay)
+                    .padding(sidebar ? 18 : 0)
+                    .frame(width: sidebar ? 290 : nil)
+                    .background {
+                        if sidebar {
+                            RoundedRectangle(cornerRadius: 20).fill(.thinMaterial)
+                        }
+                    }
+            }
+        }
     }
 
     private var masthead: some View {

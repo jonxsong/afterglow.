@@ -131,10 +131,12 @@ struct LocationOnboardingView<City: Identifiable>: View {
                     .accessibilityHidden(true)
 
                 TextField("e.g. San Francisco", text: $cityQuery)
+                    #if os(iOS)
                     .textContentType(.addressCity)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
+                    #endif
                     .focused($cityFieldFocused)
                     .accessibilityLabel("Search by city")
                     .accessibilityIdentifier("location.search")
