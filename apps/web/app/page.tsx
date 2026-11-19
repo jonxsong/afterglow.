@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, Menu } from "lucide-react";
+import { AppDownloads } from "@/components/app-downloads";
 import { BrandLogo } from "@/components/brand-logo";
 import { ForecastExperience } from "@/components/forecast-experience";
 import { LanguageToggle, useLocale } from "@/components/locale-provider";
@@ -30,6 +31,7 @@ export default function Home() {
           <h1 className={locale === "zh" ? "hero-title-zh" : ""}>{t("heroLineOne")}<br /><em>{t("heroLineTwo")}</em></h1>
           <p className="hero-description">{t("heroDescription")}</p>
           <a className="primary-cta" href="#forecast">{t("heroCta")} <ArrowDown size={17} /></a>
+          <AppDownloads />
         </div>
         <div className="hero-art">
           <SkyVisualization palette={heroPalette} cloudCover={46} interpretationLabel={t("sampleSky")} interactionLabel={t("moveToExplore")} />

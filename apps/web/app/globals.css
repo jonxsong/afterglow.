@@ -52,6 +52,15 @@ a:hover .brand-mark { transform: translateY(-1px) rotate(-2deg); }
 .hero-description { color: var(--muted); font-family: var(--serif); font-size: clamp(19px, 2vw, 25px); line-height: 1.45; margin: 46px 0 34px; max-width: 420px; }
 .primary-cta { background: var(--charcoal); color: white; display: inline-flex; align-items: center; gap: 30px; border-radius: 999px; padding: 17px 24px 17px 26px; font-size: 13px; font-weight: 650; transition: transform .25s ease, background .25s ease; }
 .primary-cta:hover { transform: translateY(-2px); background: #3b3531; }
+.app-downloads { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px; }
+.app-download-pending { display: inline-flex; align-items: center; gap: 10px; min-width: 116px; min-height: 48px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); }
+.app-download-pending svg { color: #765868; flex: none; }
+.app-download-pending strong, .app-download-pending small { display: block; line-height: 1.25; }
+.app-download-pending strong { font-size: 14px; font-weight: 650; }
+.app-download-pending small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.app-download-link { display: inline-flex; border-radius: 9px; }
+.app-download-link img { display: block; width: auto; height: 44px; }
+.app-download-link:focus-visible { outline: 2px solid #765868; outline-offset: 3px; }
 .hero-art { align-self: stretch; min-height: 610px; position: relative; }
 .hero-art .sky { height: calc(100% - 50px); min-height: 560px; border-radius: 220px 220px 14px 14px; }
 .hero-art > p { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin: 16px 4px 0; text-transform: uppercase; letter-spacing: .11em; }
