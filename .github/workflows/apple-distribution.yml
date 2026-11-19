@@ -77,12 +77,12 @@ jobs:
             *) echo 'Unsupported Apple platform.' >&2; exit 1 ;;
           esac
 
-          umask 077
           work=$(mktemp -d "$RUNNER_TEMP/afterglow-signing.XXXXXX")
           key_path="$work/AuthKey_$ASC_KEY_ID.p8"
           trap 'rm -f "$key_path"' EXIT
-          printf '%s\n' "$ASC_PRIVATE_KEY" > "$key_path"
+          (umask 077; printf '%s\n' "$ASC_PRIVATE_KEY" > "$key_path")
           unset ASC_PRIVATE_KEY
+          umask 022
 
           auth=(
             -allowProvisioningUpdates
@@ -107,9 +107,14 @@ jobs:
           EOF
           plutil -lint "$export_options"
 
+          archive_signing=("${auth[@]}" CODE_SIGN_STYLE=Automatic)
+          if [[ "$PLATFORM" == ios ]]; then
+            # TestFlight exports use distribution signing and require no registered development device.
+            archive_signing=(CODE_SIGNING_ALLOWED=NO)
+          fi
           xcodebuild -project Afterglow.xcodeproj -scheme "$scheme" \
             -configuration Release -destination "$destination" -archivePath "$archive" \
-            "${auth[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            "${archive_signing[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" archive
 
           xcodebuild -exportArchive -archivePath "$archive" \

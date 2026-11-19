@@ -5,7 +5,7 @@
 | Field | Draft |
 | --- | --- |
 | Name | Afterglow: Sunset Forecast |
-| Subtitle | Find your best golden hour |
+| Subtitle | View your Golden Hour |
 | Primary category | Weather |
 | Bundle identifier | `dev.jonzhang.afterglow` |
 | SKU | `afterglow` |
@@ -13,9 +13,9 @@
 | Keywords | sunset,golden hour,sky,twilight,forecast,palette,photography,weather |
 | Marketing URL | [Afterglow](https://afterglow.jonzhang.dev/) |
 | Support URL | [Afterglow support](./SUPPORT.md) |
-| Privacy policy URL | [Afterglow for iPhone privacy policy](./PRIVACY.md) |
+| Privacy policy URL | [Afterglow for iPhone and Mac privacy policy](./PRIVACY.md) |
 
-Both platforms share one App Store Connect record and bundle identifier. Each platform has its own signed build, screenshots, description, and review submission. [Add platforms](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-platforms)
+Both platforms share the [Afterglow App Store Connect record](https://appstoreconnect.apple.com/apps/6836620328/distribution) and bundle identifier. Each platform has its own signed build, screenshots, description, and review submission. [Add platforms](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-platforms)
 
 ### iPhone description
 
