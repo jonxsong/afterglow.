@@ -1,10 +1,6 @@
 # Architecture
 
-Afterglow has two delivery profiles around the same forecast concepts. The public Site
-uses a statically exported Next.js application and a lightweight server worker. The worker
-validates live weather from Open-Meteo or 7Timer and computes the heuristic forecast. The browser renders the interactive sky and
-performs the first photo color comparison locally. The worker serves the application and
-protects the optional OpenAI vision endpoint.
+Afterglow has a hosted forecast service and a separate self-hosted stack. The public website is a statically exported Next.js application served by the Site Worker. The same worker serves native SwiftUI clients for iPhone and Mac, which are pending public distribution. It validates live weather from Open-Meteo or 7Timer and computes the heuristic forecast. The web client renders the sky and compares photos in the browser, with an optional OpenAI reading through the worker.
 
 The full self-hosted profile is a FastAPI modular monolith. FastAPI owns location lookup,
 forecast generation, immutable prediction snapshots, photo validation, and evaluation.
@@ -12,7 +8,7 @@ PostgreSQL is the system of record, Redis backs RQ jobs, forecast caching, and r
 and uploaded photos use a storage adapter that maps to a local volume in development and
 private S3-compatible storage when `S3_BUCKET` is configured.
 
-## Forecast flow
+## Self-hosted forecast flow
 
 1. The user selects a city from Open-Meteo's geocoding API or supplies browser coordinates.
 2. FastAPI requests hourly cloud layers, humidity, visibility, precipitation probability,
@@ -26,19 +22,25 @@ The baseline is deterministic and is always labeled **heuristic**. The offline t
 pipeline is intentionally disconnected from production inference until a real labeled
 dataset exists and a leakage-safe evaluation shows improvement.
 
-## Public Site and AI reading
+## Hosted forecast and web photo reading
 
 The public `afterglow.jonzhang.dev` build reads `/api/v1/forecast/weekly`, a versioned Worker API
 that returns the palette, vibrancy, and viewing window. It uses 7Timer's live NOAA GFS feed when
 Open-Meteo is unavailable or incomplete. The worker saves validated weather by rounded coordinates,
 time zone, and local date in D1, without saving display labels. If live weather fails, the API can
-return a same-day snapshot up to 12 hours old and identify its original retrieval time. The client
+return a same-day snapshot up to 12 hours old and identify its original retrieval time. The web client
 updates the date at the selected city's midnight and uses a bundled GeoNames index if geocoding fails.
 The Site worker also serves the exported Next.js assets and exposes the protected `POST /api/ai/analyze` route. The browser first performs palette extraction and
 comparison locally. Only after the visitor explicitly requests an AI reading does it resize
 the photograph and send that copy to the worker. The worker validates the payload, applies
 per-client throttling, and calls the OpenAI Responses API with `store: false`; the API key
 never enters client JavaScript.
+
+## Native SwiftUI clients
+
+The `Afterglow` iPhone target and the native `AfterglowMac` target share the forecast, location, and photo comparison source in `apps/ios/`. They use the hosted forecast and city search endpoints and work without sign-in. Core Location supplies approximate coordinates when users explicitly request their current location. Each device can restore its last forecast when the selected city’s local date still matches.
+
+The apps use the system photo picker on iPhone and the file picker on Mac. Apple Vision helps exclude foreground subjects, and the palette comparison runs entirely on the device. The optional hosted OpenAI reading is a web feature.
 
 ## Reliability and privacy
 

@@ -7,7 +7,7 @@
 ### View the golden hour.
 
 **Sunset intelligence for people who appreciate beautiful skies.**<br />
-Afterglow predicts the evening palette from live atmospheric data, then lets the real sky answer back through private color comparison and an optional AI interpretation.
+Afterglow predicts the evening palette from live atmospheric data and lets you compare it with a sunset photo. The website also offers an optional AI interpretation.
 
 [![Live Site](https://img.shields.io/badge/Live-afterglow.jonzhang.dev-24211F?style=for-the-badge&logo=cloudflare&logoColor=F2B28D)](https://afterglow.jonzhang.dev/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-24211F?style=for-the-badge&logo=nextdotjs&logoColor=white)](./apps/web)
@@ -15,7 +15,7 @@ Afterglow predicts the evening palette from live atmospheric data, then lets the
 [![OpenAI](https://img.shields.io/badge/OpenAI-vision_readings-8D83BA?style=for-the-badge&logo=openai&logoColor=white)](#ai-sky-readings)
 [![Tests](https://img.shields.io/badge/tests-passing-657D69?style=for-the-badge&logo=pytest&logoColor=white)](#quality)
 
-[**Open Afterglow ↗**](https://afterglow.jonzhang.dev/) · [iPhone app](./apps/ios/README.md) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
+[**Open Afterglow ↗**](https://afterglow.jonzhang.dev/) · [iPhone & Mac](#afterglow-on-iphone-and-mac) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api-surface)
 
 <br />
 
@@ -39,16 +39,16 @@ For any supported location, Afterglow presents:
 - a 0–100 vibrancy score and confidence estimate;
 - the best local-time viewing window;
 - cloud-layer, humidity, precipitation, and visibility context;
-- a seven-evening outlook with the strongest sunset highlighted; and
-- private in-browser photo verification using perceptual color comparison; and
-- an optional OpenAI vision reading with a color story, atmospheric interpretation, forecast match, and photography tip.
+- a seven-evening outlook with the strongest sunset highlighted;
+- private photo verification using perceptual color comparison; and
+- an optional OpenAI vision reading on the website with a color story, atmospheric interpretation, forecast match, and photography tip.
 
 The sunset visualization is explicitly an **interpretation of forecast conditions**, not a fabricated photograph of the future.
 
 ## AI sky readings
 
-Afterglow's forecast itself remains a transparent atmospheric heuristic. AI enters only
-after a visitor uploads a real sunset and explicitly selects **Read this sky with AI**.
+Afterglow's forecast itself remains a transparent atmospheric heuristic. On the website,
+the optional AI reading runs after a visitor selects a sunset photo and chooses **Read this sky with AI**.
 The vision reading describes the visible palette and mood, offers a cautious atmospheric
 interpretation, compares the photograph with the forecast, suggests a photography technique,
 and returns a visual match score.
@@ -68,6 +68,14 @@ The interface is mobile-first, keyboard accessible, reduced-motion aware, and in
 
 To share a city, choose **Change location** in Tonight’s Forecast, then select **Share forecast** and paste the copied link. It opens directly to the selected city’s latest forecast. Links made from your device location use approximate coordinates.
 
+## Afterglow on iPhone and Mac
+
+The [public website](https://afterglow.jonzhang.dev/) is available now. The SwiftUI apps for iPhone and Mac are in this repository and pending public distribution. Both use the same production forecast API and work without sign-in.
+
+Choose a city or use approximate device location through Core Location. The apps keep a same-day forecast on the device for outages. Photo comparison runs on-device, using Apple Vision to help mask foreground subjects and perceptual color distance to compare the palettes. Choose a photo from your library on iPhone or open an image file on Mac.
+
+The [Apple app setup guide](./apps/ios/README.md) covers both native targets, iOS 17+ and macOS 14+.
+
 ## Architecture
 
 <div align="center">
@@ -78,16 +86,14 @@ To share a city, choose **Change location** in Tonight’s Forecast, then select
   <sub>Click the diagram for a full-size view.</sub>
 </div>
 
-Afterglow has two deliberate delivery profiles. The public product is a compact Next.js +
-Site Worker application: forecast data comes from Open-Meteo or 7Timer, local color comparison stays
-in the browser, and the worker protects the optional OpenAI call. The repository also contains
-a fuller FastAPI modular monolith for durable snapshots, queues, private object storage, and
-self-hosted or AWS deployments.
+The public Next.js site and native SwiftUI clients share a hosted Site Worker. It computes forecasts from Open-Meteo or 7Timer and saves validated weather in D1 for outages. Photo comparison runs locally in each client. The web app can also request an optional OpenAI reading through the worker.
+
+The repository also contains a FastAPI modular monolith for durable snapshots, queues, private object storage, and self-hosted or AWS deployments.
 
 | Layer | Responsibilities |
 | --- | --- |
 | **Next.js web** | Editorial UI, location search, query lifecycle, deterministic sky visualization, responsive interactions |
-| **SwiftUI iPhone app** | Location-first onboarding, live and saved forecasts from the site worker, an interactive sunset timeline, and on-device photo comparison |
+| **SwiftUI iPhone and Mac apps** | City selection, optional Core Location, live and saved forecasts, an interactive sunset timeline, and on-device Vision-assisted photo comparison |
 | **Hosted site worker** | Shared forecast API, weather validation and failover, D1 forecast snapshots, static assets, optional AI analysis |
 | **FastAPI application** | Validation, forecast orchestration, immutable snapshots, uploads, evaluations, OpenAPI |
 | **Forecast domain** | Solar position, sunset windows, atmospheric feature engineering, palettes, vibrancy, confidence |
@@ -109,9 +115,9 @@ cloud layers · humidity · visibility · precipitation · forecast horizon
 solar geometry + atmospheric heuristic baseline
    ↓
 palette · vibrancy · confidence · best viewing window
-   ↓
-immutable prediction snapshot → optional observed-photo evaluation
 ```
+
+The self-hosted API can also store an immutable prediction snapshot for observed-photo evaluation.
 
 The production model is deliberately labeled **heuristic**. Weather APIs do not directly forecast sunset colors, and this project does not claim trained-model performance without a representative labeled dataset and a real held-out evaluation.
 
@@ -120,6 +126,7 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 | Product | Data and intelligence | Delivery |
 | --- | --- | --- |
 | Next.js 15, React 19, TypeScript | Python 3.12, FastAPI, Pydantic | Docker and Docker Compose |
+| SwiftUI for iPhone and Mac | Core Location and Apple Vision | XcodeGen and Xcode |
 | TanStack Query, Motion, Tailwind CSS | SQLAlchemy, Alembic, PostgreSQL | AWS ECS Fargate starter |
 | Accessible responsive components | Redis, RQ, Pillow, scikit-learn | Terraform and GitHub Actions |
 | Deterministic CSS sky renderer | Open-Meteo weather and geocoding, 7Timer backup | Public `afterglow.jonzhang.dev` worker deployment |
@@ -130,6 +137,7 @@ The production model is deliberately labeled **heuristic**. Weather APIs do not 
 ```text
 afterglow/
 ├── apps/web/                  # Next.js App Router experience
+├── apps/ios/                  # Shared SwiftUI app source and iPhone/Mac targets
 ├── services/site-worker/      # Hosted forecast API, D1 snapshots, and optional AI
 ├── scripts/                   # Site build, preview, and production smoke checks
 ├── services/api/              # FastAPI modular monolith + migrations
@@ -162,7 +170,7 @@ docker compose up --build
 | API | [http://localhost:8000](http://localhost:8000) |
 | OpenAPI | [http://localhost:8000/docs](http://localhost:8000/docs) |
 
-### Native development
+### Web stack without Docker
 
 Use Python 3.12+, Node.js 22+, and pnpm.
 
@@ -182,6 +190,10 @@ In another terminal:
 pnpm install
 pnpm --dir apps/web dev
 ```
+
+### Native iPhone and Mac apps
+
+Generate the Xcode project from `apps/ios/project.yml`. The [Apple app setup guide](./apps/ios/README.md) has the build and test instructions for the `Afterglow` and `AfterglowMac` schemes.
 
 ## Configuration
 
@@ -203,9 +215,13 @@ Copy [`.env.example`](./.env.example) and adjust only what your environment need
 | `OPENAI_API_KEY` | Optional server-side AI sky readings | unset |
 | `OPENAI_MODEL` | Vision-capable Responses API model | `gpt-4.1-mini` |
 
-The hosted `/api/v1/forecast/weekly` endpoint calculates the palette, vibrancy, and viewing window. It validates [Open-Meteo](https://open-meteo.com/) weather and tries [7Timer](https://www.7timer.info/) when the first source is unavailable or incomplete. The backup uses three-hour samples and omits visibility and rain probability. If both feeds fail, the worker can return the last valid forecast for the same city and local day from D1, with its original retrieval time, for up to 12 hours. City search can use a bundled index adapted from [GeoNames](https://www.geonames.org/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The optional OpenAI key is a protected runtime secret. AI photo readings consume OpenAI API usage.
+The hosted `/api/v1/forecast/weekly` endpoint calculates the palette, vibrancy, and viewing window. It validates [Open-Meteo](https://open-meteo.com/) weather and tries [7Timer](https://www.7timer.info/) when the first source is unavailable or incomplete. The backup uses three-hour samples and omits visibility and rain probability. If both feeds fail, the worker can return the last valid forecast for the same city and local day from D1, with its original retrieval time, for up to 12 hours. Web city search can use a bundled index adapted from [GeoNames](https://www.geonames.org/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The optional OpenAI key is a protected runtime secret. AI photo readings consume OpenAI API usage.
 
 ## API surface
+
+The hosted website and native clients use `GET /api/v1/forecast/weekly` and `GET /api/weather/geocoding`. The hosted website also uses `POST /api/ai/analyze` for optional readings.
+
+The self-hosted FastAPI service provides the following endpoints:
 
 ```http
 GET  /api/v1/locations/search?q=...
@@ -214,12 +230,11 @@ GET  /api/v1/forecast/weekly
 GET  /api/v1/forecast/{prediction_id}
 POST /api/v1/observations
 GET  /api/v1/evaluations/{prediction_id}
-POST /api/ai/analyze
 GET  /health
 GET  /ready
 ```
 
-The interactive schema is available at `/docs` whenever the API is running.
+The interactive FastAPI schema is available at `/docs`.
 
 ## Quality
 
@@ -238,6 +253,8 @@ k6 run tests/load/forecast.js
 ```
 
 CI checks the Python API and migration, then builds the hosted Worker and runs the web, storage, and browser tests against that build. The production smoke check opens a real city share link and checks the rendered sunset and forecast's local date.
+
+For native development, see the [Apple app test instructions](./apps/ios/README.md#run-the-tests).
 
 ```bash
 pnpm --dir apps/web exec playwright install chromium
@@ -276,7 +293,8 @@ See the complete [evaluation contract](./ml/evaluation/README.md).
 
 ## Deployment
 
-- **Production:** [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev/)
+- **Public website:** [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev/)
+- **iPhone and Mac:** [native builds from the repository](./apps/ios/README.md), public distribution pending
 - **Local:** Docker Compose or native processes
 - **AWS-ready:** ECS Fargate, RDS PostgreSQL, ElastiCache Redis, private S3, ECR, CloudWatch, and Terraform
 
