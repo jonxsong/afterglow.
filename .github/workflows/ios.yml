@@ -130,3 +130,16 @@ jobs:
           name: Afterglow-Mac-XCTest
           path: ${{ runner.temp }}/Afterglow-Mac.xcresult
           if-no-files-found: ignore
+      - name: Export native Mac screenshots
+        if: ${{ success() }}
+        run: |
+          xcrun xcresulttool export attachments \
+            --path "$RUNNER_TEMP/Afterglow-Mac.xcresult" \
+            --output-path "$RUNNER_TEMP/Afterglow-Mac-Screenshots"
+      - name: Upload native Mac screenshots
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Afterglow-Mac-Screenshots
+          path: ${{ runner.temp }}/Afterglow-Mac-Screenshots/
+          if-no-files-found: error
