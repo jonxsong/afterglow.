@@ -1,0 +1,116 @@
+name: Upload signed Apple builds to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: App platform to upload
+        type: choice
+        options:
+          - both
+          - ios
+          - macos
+        default: both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: afterglow-testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 35
+    environment: apple-distribution
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platform == 'both' && '["ios","macos"]' || format('["{0}"]', inputs.platform)) }}
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify Xcode and generate the project
+        run: |
+          xcode_version=$(xcodebuild -version)
+          printf '%s\n' "$xcode_version"
+          major=$(awk 'NR == 1 { split($2, version, "."); print version[1] }' <<< "$xcode_version")
+          if [[ ! "$major" =~ ^[0-9]+$ || "$major" -lt 26 ]]; then
+            echo 'Xcode 26 or newer is required.' >&2
+            exit 1
+          fi
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
+          xcodegen generate
+      - name: Archive and upload to App Store Connect
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          for variable in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error::Configure $variable in the apple-distribution environment."
+              exit 1
+            fi
+          done
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ||
+                ! "$ASC_KEY_ID" =~ ^[A-Z0-9]{10}$ ||
+                ! "$ASC_ISSUER_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+            echo 'The Apple team, key, or issuer identifier has an invalid format.' >&2
+            exit 1
+          fi
+
+          case "$PLATFORM" in
+            ios) scheme=Afterglow; destination='generic/platform=iOS' ;;
+            macos) scheme=AfterglowMac; destination='generic/platform=macOS' ;;
+            *) echo 'Unsupported Apple platform.' >&2; exit 1 ;;
+          esac
+
+          umask 077
+          work=$(mktemp -d "$RUNNER_TEMP/afterglow-signing.XXXXXX")
+          key_path="$work/AuthKey_$ASC_KEY_ID.p8"
+          trap 'rm -f "$key_path"' EXIT
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$key_path"
+          unset ASC_PRIVATE_KEY
+
+          auth=(
+            -allowProvisioningUpdates
+            -authenticationKeyPath "$key_path"
+            -authenticationKeyID "$ASC_KEY_ID"
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          )
+          archive="$work/Afterglow.xcarchive"
+          export_options="$work/ExportOptions.plist"
+          cat > "$export_options" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><true/>
+          </dict>
+          </plist>
+          EOF
+          plutil -lint "$export_options"
+
+          xcodebuild -project Afterglow.xcodeproj -scheme "$scheme" \
+            -configuration Release -destination "$destination" -archivePath "$archive" \
+            "${auth[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" archive
+
+          xcodebuild -exportArchive -archivePath "$archive" \
+            -exportOptionsPlist "$export_options" -exportPath "$work/export" "${auth[@]}"
