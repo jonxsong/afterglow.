@@ -1,12 +1,12 @@
-# Afterglow for iPhone
+# Afterglow for iPhone and Mac
 
 Afterglow uses SwiftUI and the same forecast API as [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev). Choose a city, watch the first-opening sunrise turn into a sunset, then see the local viewing window and explore the changing sky. The app works without sign-in.
 
-`project.yml` defines the application and its XCTest target. Generate the Xcode project before opening it.
+`project.yml` defines both native apps and their XCTest targets. Generate the Xcode project before opening it.
 
 ## Run on a Mac
 
-Install [Xcode 26 or newer](https://developer.apple.com/xcode/) with an iOS Simulator runtime and [XcodeGen](https://yonaskolb.github.io/XcodeGen/) 2.42 or newer. The app targets iOS 17 and later.
+Install [Xcode 26 or newer](https://developer.apple.com/xcode/) with an iOS Simulator runtime and [XcodeGen](https://yonaskolb.github.io/XcodeGen/) 2.42 or newer. The apps target iOS 17 and macOS 14 or later.
 
 ```sh
 brew install xcodegen
@@ -15,7 +15,7 @@ xcodegen generate
 open Afterglow.xcodeproj
 ```
 
-Select the **Afterglow** scheme and an iPhone simulator, then run the app. Choose a city to try a live forecast or use simulated location data to test the location permission flow.
+Select **Afterglow** and an iPhone simulator, or **AfterglowMac** and **My Mac**. Choose a city to try a live forecast. The Mac app uses a resizable window with the week ahead alongside the sunset forecast on wider windows. Press **⌘R** to refresh.
 
 ## Run the tests
 
@@ -27,12 +27,12 @@ xcodebuild -project Afterglow.xcodeproj -scheme Afterglow \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-The [iOS Simulator workflow](../../.github/workflows/ios.yml) generates the project and runs XCTest in the simulator. It can also run manually from GitHub Actions.
+Run the shared tests on Mac with `xcodebuild -project Afterglow.xcodeproj -scheme AfterglowMac -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test`. The [Apple Apps CI workflow](../../.github/workflows/ios.yml) runs both suites and builds both Release configurations.
 
 ## Data and permissions
 
 - Forecasts come from `/api/v1/forecast/weekly`. City search uses `/api/weather/geocoding`.
 - Location access is requested when you choose to find a nearby forecast. You can also choose a city manually.
-- Photo comparison runs locally using the photo you select through the system picker. Apple Vision helps mask foreground subjects, and CIE76 compares the observed and forecast palettes. The repository’s offline training pipeline is a separate weather-vibrancy experiment.
+- Photo comparison runs locally using a photo from the iPhone Photos picker or Mac Finder. Apple Vision helps mask foreground subjects, and CIE76 compares the observed and forecast palettes. The repository’s offline training pipeline is a separate weather-vibrancy experiment.
 
 See the [App Store release checklist](./APP-STORE.md), [privacy policy](./PRIVACY.md), and [support page](./SUPPORT.md).
