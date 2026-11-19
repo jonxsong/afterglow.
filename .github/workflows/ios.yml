@@ -1,4 +1,4 @@
-name: iOS Simulator
+name: Apple Apps CI
 
 on:
   push:
@@ -96,3 +96,37 @@ jobs:
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/Afterglow-Device" \
             CODE_SIGNING_ALLOWED=NO build
+  macos:
+    name: Native macOS
+    runs-on: macos-26
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate the Xcode project
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
+          xcodegen generate
+      - name: Run native Mac unit tests
+        run: |
+          xcodebuild -project Afterglow.xcodeproj -scheme AfterglowMac \
+            -destination 'platform=macOS' -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/Afterglow-Mac.xcresult" \
+            CODE_SIGNING_ALLOWED=NO test
+      - name: Build the native Mac Release configuration
+        run: |
+          xcodebuild -project Afterglow.xcodeproj -scheme AfterglowMac \
+            -configuration Release -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/Afterglow-Mac-Release" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Upload the Mac XCTest result bundle
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Afterglow-Mac-XCTest
+          path: ${{ runner.temp }}/Afterglow-Mac.xcresult
+          if-no-files-found: ignore
