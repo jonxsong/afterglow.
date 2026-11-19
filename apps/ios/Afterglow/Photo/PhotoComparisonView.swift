@@ -1,13 +1,27 @@
 import Foundation
-import PhotosUI
 import SwiftUI
+#if os(macOS)
+import UniformTypeIdentifiers
+#else
+import PhotosUI
+#endif
 
 struct PhotoComparisonView: View {
     let predictedPalette: [String]
 
+    #if os(macOS)
+    private struct Selection: Equatable, Sendable {
+        let url: URL
+        let id = UUID()
+    }
+    @State private var showingFilePicker = false
+    #else
+    private typealias Selection = PhotosPickerItem
+    #endif
+
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var swatchHeight = 20
-    @State private var selection: PhotosPickerItem?
+    @State private var selection: Selection?
     @State private var photo: ProcessedSunsetPhoto?
     @State private var activeRequest: UUID?
     @State private var selectionError: SunsetPhotoError?
@@ -18,6 +32,29 @@ struct PhotoComparisonView: View {
 
     var body: some View {
         let item = selection
+        ScrollView {
+            comparisonCard
+                .frame(maxWidth: 540)
+                .padding(16)
+                .frame(maxWidth: .infinity)
+        }
+        #if os(macOS)
+        .frame(minWidth: 470, idealWidth: 590, minHeight: 380, idealHeight: 570)
+        .fileImporter(isPresented: $showingFilePicker, allowedContentTypes: [.image]) { result in
+            switch result {
+            case let .success(url):
+                selection = Selection(url: url)
+            case .failure:
+                selectionError = .unavailable
+            }
+        }
+        #endif
+        .task(id: item) {
+            if let item { await load(item) }
+        }
+    }
+
+    private var comparisonCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Compare a sunset photo")
                 .font(.system(.title2, design: .serif).weight(.semibold))
@@ -35,15 +72,11 @@ struct PhotoComparisonView: View {
                     .foregroundStyle(.secondary)
             }
 
-            PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
-                Label(photo == nil ? "Choose a sunset photo" : "Choose a different photo", systemImage: "photo")
-                    .frame(minHeight: 44)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(accent)
-            .disabled(predictedPalette.isEmpty)
-            .accessibilityIdentifier("photo.choose")
+            photoPicker
+                .buttonStyle(.borderedProminent)
+                .tint(accent)
+                .disabled(predictedPalette.isEmpty)
+                .accessibilityIdentifier("photo.choose")
 
             if activeRequest != nil {
                 ProgressView("Reading colors…")
@@ -70,15 +103,32 @@ struct PhotoComparisonView: View {
                 .accessibilityIdentifier("photo.clear")
             }
 
-            Label("Afterglow compares photos on your iPhone and never uploads them.", systemImage: "lock")
+            Label("Afterglow compares photos on this device without uploading them.", systemImage: "lock")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .padding(20)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .task(id: item) {
-            if let item { await load(item) }
+    }
+
+    private var photoPicker: some View {
+        #if os(macOS)
+        Button {
+            showingFilePicker = true
+        } label: {
+            pickerLabel
         }
+        #else
+        PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
+            pickerLabel
+        }
+        #endif
+    }
+
+    private var pickerLabel: some View {
+        Label(photo == nil ? "Choose a sunset photo" : "Choose a different photo", systemImage: "photo")
+            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity)
     }
 
     private func comparison(for photo: ProcessedSunsetPhoto, match: PhotoPaletteMatch) -> some View {
@@ -131,7 +181,7 @@ struct PhotoComparisonView: View {
     }
 
     @MainActor
-    private func load(_ item: PhotosPickerItem) async {
+    private func load(_ item: Selection) async {
         guard item == selection, !Task.isCancelled else { return }
         let request = UUID()
         activeRequest = request
@@ -141,6 +191,15 @@ struct PhotoComparisonView: View {
         }
 
         do {
+            #if os(macOS)
+            let work = Task.detached(priority: .userInitiated) {
+                let url = item.url
+                let hasAccess = url.startAccessingSecurityScopedResource()
+                defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
+                let thumbnail = try SunsetPhotoProcessing.thumbnail(from: url)
+                return try SunsetPhotoProcessing.process(SunsetPhotoSelection(thumbnail: thumbnail))
+            }
+            #else
             guard let imported = try await item.loadTransferable(type: SunsetPhotoSelection.self) else {
                 throw SunsetPhotoError.unavailable
             }
@@ -149,6 +208,7 @@ struct PhotoComparisonView: View {
             let work = Task.detached(priority: .userInitiated) {
                 try SunsetPhotoProcessing.process(imported)
             }
+            #endif
             let processed = try await withTaskCancellationHandler {
                 try await work.value
             } onCancel: {

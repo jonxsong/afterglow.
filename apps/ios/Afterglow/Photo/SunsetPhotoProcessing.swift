@@ -15,7 +15,7 @@ enum SunsetPhotoError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            return "Photos couldn’t open that image. Try choosing one available on this iPhone."
+            return "Afterglow couldn’t open that image. Try choosing another photo."
         case .unsupported:
             return "That image format couldn’t be read. Try another sunset photo."
         case .tooLarge:
