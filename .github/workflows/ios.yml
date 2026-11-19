@@ -51,7 +51,7 @@ jobs:
             | sort_by(.key | split(".iOS-")[1] | split("-") | map(tonumber))
             | reverse
             | [.[].value[] | select(.isAvailable and (.name | startswith("iPhone")))]
-            | first // empty
+            | (map(select(.name | endswith("Pro Max"))) | first) // first // empty
           ')
           if [[ -z "$device" ]]; then
             echo 'The runner has no available iPhone simulator.' >&2

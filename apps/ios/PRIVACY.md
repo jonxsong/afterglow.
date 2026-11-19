@@ -6,6 +6,8 @@ You can use Afterglow by searching for a city. The app sends your search to Afte
 
 Afterglow’s forecast service receives the selected place and its coordinates to retrieve weather from Open-Meteo or 7Timer. The service keeps shared weather snapshots indexed by forecast area to handle provider outages. It can serve these snapshots for up to 12 hours. They contain weather data and an area key, with no account or device identifier. Cloudflare hosts the forecast service and processes its network requests.
 
+Open-Meteo receives city search queries and forecast coordinates from Afterglow’s service. Its troubleshooting logs may include request data such as coordinates and are deleted after 90 days. Afterglow uses approximate location and city searches to provide forecasts and city results without linking them to an account or using them for tracking. [Open-Meteo privacy notice](https://open-meteo.com/en/terms#privacy)
+
 The app saves the selected city and most recent forecast on the device you use. Change the city to use a different location.
 
 ## Sunset photos

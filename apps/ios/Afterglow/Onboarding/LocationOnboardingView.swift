@@ -202,6 +202,11 @@ struct LocationOnboardingView<City: Identifiable>: View {
                     RoundedRectangle(cornerRadius: 16)
                         .strokeBorder(border, lineWidth: 1)
                 }
+
+                Text("City data from [GeoNames](https://www.geonames.org/) via [Open-Meteo](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), adapted by Afterglow.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             case .failed:
                 VStack(alignment: .leading, spacing: 2) {
                     Text("City search is unavailable right now.")
