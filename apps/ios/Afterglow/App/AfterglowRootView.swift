@@ -2,12 +2,6 @@ import SwiftUI
 
 @MainActor
 struct AfterglowRootView: View {
-    private enum Screen {
-        case opening
-        case home
-        case forecast
-    }
-
     private enum Sheet: String, Identifiable {
         case location
         case privacy
@@ -21,22 +15,17 @@ struct AfterglowRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sheet: Sheet?
-    @State private var screen = Screen.opening
+    @State private var isShowingOpening = true
+    @State private var isShowingHome = false
 
     var body: some View {
         Group {
-            switch screen {
-            case .opening:
-                OpeningSequenceView {
-                    show(session.location == nil ? .home : .forecast)
-                }
-                .transition(.opacity)
-            case .home:
+            if session.location == nil || isShowingHome {
                 cityPicker(asSheet: false)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
                         HStack(spacing: 20) {
                             if session.location != nil {
-                                Button("Back to forecast") { show(.forecast) }
+                                Button("Back to forecast") { showHome(false) }
                                     .accessibilityIdentifier("home.forecast")
                             }
                             Button("Privacy") { sheet = .privacy }
@@ -45,13 +34,25 @@ struct AfterglowRootView: View {
                         .padding(.vertical, 10)
                     }
                     .transition(.opacity)
-            case .forecast:
+            } else {
                 ForecastView(
                     session: session,
-                    onHome: { show(.home) },
+                    onHome: { showHome(true) },
                     onChangeCity: { sheet = .location },
                     onPrivacy: { sheet = .privacy }
                 )
+                .transition(.opacity)
+            }
+        }
+        .allowsHitTesting(!isShowingOpening)
+        .accessibilityHidden(isShowingOpening)
+        .overlay {
+            if isShowingOpening {
+                OpeningSequenceView {
+                    withAnimation(transitionAnimation) {
+                        isShowingOpening = false
+                    }
+                }
                 .transition(.opacity)
             }
         }
@@ -80,9 +81,13 @@ struct AfterglowRootView: View {
         }
     }
 
-    private func show(_ destination: Screen) {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
-            screen = destination
+    private var transitionAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.20)
+    }
+
+    private func showHome(_ visible: Bool) {
+        withAnimation(transitionAnimation) {
+            isShowingHome = visible
         }
     }
 
@@ -100,7 +105,7 @@ struct AfterglowRootView: View {
                 if asSheet {
                     sheet = nil
                 } else {
-                    show(.forecast)
+                    showHome(false)
                 }
             }
         )

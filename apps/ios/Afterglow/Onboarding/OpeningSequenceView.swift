@@ -8,6 +8,7 @@ struct OpeningSequenceView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var startedAt = Date()
+    @State private var isHoldingLogo = false
     @State private var finished = false
 
     private let animationDuration = 2.6
@@ -16,8 +17,10 @@ struct OpeningSequenceView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             GeometryReader { proxy in
-                TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || finished)) { timeline in
-                    let progress = reduceMotion ? 1 : min(1, max(0, timeline.date.timeIntervalSince(startedAt) / animationDuration))
+                let isStatic = reduceMotion || isHoldingLogo
+                TimelineView(.animation(minimumInterval: 1.0 / 60, paused: isStatic || finished)) { timeline in
+                    let elapsed = timeline.date.timeIntervalSince(startedAt)
+                    let progress = isStatic ? 1 : min(1, max(0, elapsed / animationDuration))
                     scene(size: proxy.size, progress: progress)
                 }
             }
@@ -38,8 +41,13 @@ struct OpeningSequenceView: View {
         .task {
             startedAt = Date()
             do {
-                let duration = reduceMotion ? 0.2 : animationDuration + logoHoldDuration
-                try await Task.sleep(for: .seconds(duration))
+                if reduceMotion {
+                    try await Task.sleep(for: .seconds(0.2))
+                } else {
+                    try await Task.sleep(for: .seconds(animationDuration))
+                    isHoldingLogo = true
+                    try await Task.sleep(for: .seconds(logoHoldDuration))
+                }
                 #if DEBUG
                 // Keep Skip available while XCTest waits for the launch window.
                 if ProcessInfo.processInfo.arguments.contains("--ui-test-hold-opening") {
