@@ -7,18 +7,16 @@ final class MacForecastFlowTests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchArguments = [
-            "--ui-test-city-flow", "--ui-test-reset", "--ui-test-hold-opening",
+            "--ui-test-city-flow", "--ui-test-reset",
+            "-ApplePersistenceIgnoreState", "YES",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ]
         app.launch()
 
+        let search = app.textFields["location.search"]
+        XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 15))
         let window = app.windows.firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 12))
-        let skipOpening = window.buttons["opening.skip"]
-        XCTAssertTrue(skipOpening.waitForExistence(timeout: 5))
-        skipOpening.click()
-        let search = window.textFields["location.search"]
-        XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 10))
+        XCTAssertTrue(window.exists)
         XCTAssertTrue(window.buttons["location.current"].exists)
         capture(window, as: "Afterglow-Mac-Location")
 
