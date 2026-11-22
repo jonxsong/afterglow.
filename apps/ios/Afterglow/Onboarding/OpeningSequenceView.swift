@@ -40,6 +40,12 @@ struct OpeningSequenceView: View {
             do {
                 let duration = reduceMotion ? 0.2 : animationDuration + logoHoldDuration
                 try await Task.sleep(for: .seconds(duration))
+                #if DEBUG
+                // Keep Skip available while XCTest waits for the launch window.
+                if ProcessInfo.processInfo.arguments.contains("--ui-test-hold-opening") {
+                    return
+                }
+                #endif
                 finish()
             } catch is CancellationError {
                 // The user already skipped, or this view left the hierarchy.

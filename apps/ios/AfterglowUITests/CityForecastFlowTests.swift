@@ -8,8 +8,6 @@ final class CityForecastFlowTests: XCTestCase {
         app.launchArguments = ["--ui-test-city-flow", "--ui-test-reset"]
         app.launch()
 
-        let skipOpening = app.buttons["opening.skip"]
-        XCTAssertTrue(skipOpening.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Where will you watch?"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["location.current"].exists)
         XCTAssertFalse(XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch.exists)
@@ -42,8 +40,9 @@ final class CityForecastFlowTests: XCTestCase {
         app.buttons["Done"].tap()
 
         app.terminate()
-        app.launchArguments = ["--ui-test-city-flow"]
+        app.launchArguments = ["--ui-test-city-flow", "--ui-test-hold-opening"]
         app.launch()
+        let skipOpening = app.buttons["opening.skip"]
         XCTAssertTrue(skipOpening.waitForExistence(timeout: 5))
         skipOpening.tap()
         XCTAssertTrue(app.staticTexts["Tonight’s sky"].waitForExistence(timeout: 10))

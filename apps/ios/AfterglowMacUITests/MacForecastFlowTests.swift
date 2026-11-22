@@ -7,14 +7,16 @@ final class MacForecastFlowTests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchArguments = [
-            "--ui-test-city-flow", "--ui-test-reset",
+            "--ui-test-city-flow", "--ui-test-reset", "--ui-test-hold-opening",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ]
         app.launch()
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 12))
-        XCTAssertTrue(window.buttons["opening.skip"].waitForExistence(timeout: 5))
+        let skipOpening = window.buttons["opening.skip"]
+        XCTAssertTrue(skipOpening.waitForExistence(timeout: 5))
+        skipOpening.click()
         let search = window.textFields["location.search"]
         XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 10))
         XCTAssertTrue(window.buttons["location.current"].exists)
