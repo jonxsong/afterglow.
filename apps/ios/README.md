@@ -1,6 +1,6 @@
 # Afterglow for iPhone and Mac
 
-Afterglow uses SwiftUI and the same forecast API as [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev). Choose a city, watch the first-opening sunrise turn into a sunset, then see the local viewing window and explore the changing sky. The app works without sign-in.
+Afterglow uses SwiftUI and the same forecast API as [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev). Each fresh launch opens with a sunrise-to-sunset animation that resolves into the Afterglow logo. After the intro, choose a city or go straight to the saved city’s forecast. The app works without sign-in.
 
 `project.yml` defines both native apps and their XCTest targets. Generate the Xcode project before opening it.
 

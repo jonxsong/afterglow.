@@ -15,23 +15,25 @@ struct AfterglowRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sheet: Sheet?
+    @State private var isShowingOpening = true
 
     var body: some View {
         Group {
-            if session.location == nil {
+            if isShowingOpening {
+                OpeningSequenceView {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
+                        isShowingOpening = false
+                    }
+                }
+                .transition(.opacity)
+            } else if session.location == nil {
                 cityPicker(asSheet: false)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
                         Button("Privacy") { sheet = .privacy }
                             .font(.footnote)
                             .padding(.vertical, 10)
                     }
-            } else if !session.hasSeenOpening {
-                OpeningSequenceView {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
-                        session.finishOpening()
-                    }
-                }
-                .transition(.opacity)
+                    .transition(.opacity)
             } else {
                 ForecastView(
                     session: session,

@@ -4,7 +4,6 @@ import Foundation
 struct LocalForecastStore {
     private enum Key {
         static let location = "afterglow.selected-location"
-        static let openingSeen = "afterglow.opening-seen"
         static let forecast = "afterglow.saved-forecast"
     }
 
@@ -22,11 +21,6 @@ struct LocalForecastStore {
     var selectedLocation: ForecastLocation? {
         get { decode(ForecastLocation.self, key: Key.location) }
         nonmutating set { write(newValue, key: Key.location) }
-    }
-
-    var hasSeenOpening: Bool {
-        get { defaults.bool(forKey: Key.openingSeen) }
-        nonmutating set { defaults.set(newValue, forKey: Key.openingSeen) }
     }
 
     func forecast(for location: ForecastLocation, now: Date) -> WeeklyForecast? {

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// A one-time introduction. The caller owns whether it should appear on launch.
+/// The sunrise-to-sunset animation shown before the app’s main content.
 struct OpeningSequenceView: View {
     var onFinish: () -> Void
 
@@ -10,13 +10,14 @@ struct OpeningSequenceView: View {
     @State private var startedAt = Date()
     @State private var finished = false
 
-    private let duration = 1.55
+    private let animationDuration = 2.6
+    private let logoHoldDuration = 0.6
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             GeometryReader { proxy in
                 TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || finished)) { timeline in
-                    let progress = reduceMotion ? 1 : min(1, max(0, timeline.date.timeIntervalSince(startedAt) / duration))
+                    let progress = reduceMotion ? 1 : min(1, max(0, timeline.date.timeIntervalSince(startedAt) / animationDuration))
                     scene(size: proxy.size, progress: progress)
                 }
             }
@@ -32,11 +33,13 @@ struct OpeningSequenceView: View {
                 .padding(.trailing, 20)
                 .padding(.top, 8)
                 .accessibilityHint("Continues to Afterglow")
+                .accessibilityIdentifier("opening.skip")
         }
         .task {
             startedAt = Date()
             do {
-                try await Task.sleep(for: .seconds(reduceMotion ? 0.2 : duration))
+                let duration = reduceMotion ? 0.2 : animationDuration + logoHoldDuration
+                try await Task.sleep(for: .seconds(duration))
                 finish()
             } catch is CancellationError {
                 // The user already skipped, or this view left the hierarchy.

@@ -16,16 +16,13 @@ final class ForecastSessionTests: XCTestCase {
         let session = ForecastSession(service: StubForecastService(forecast: forecast), store: store, now: { sunset })
 
         XCTAssertNil(session.location)
-        XCTAssertFalse(session.hasSeenOpening)
         session.select(city)
-        session.finishOpening()
         await session.refresh()
         XCTAssertEqual(session.forecast?.tonight?.id, "forecast")
         XCTAssertFalse(session.isShowingSavedForecast)
 
         let restored = ForecastSession(service: StubForecastService(forecast: nil), store: store, now: { sunset })
         XCTAssertEqual(restored.location, city)
-        XCTAssertTrue(restored.hasSeenOpening)
         XCTAssertTrue(restored.isShowingSavedForecast)
         await restored.refresh()
 

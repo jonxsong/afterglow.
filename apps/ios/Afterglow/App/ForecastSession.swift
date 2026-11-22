@@ -7,7 +7,6 @@ final class ForecastSession: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published private(set) var isShowingSavedForecast = false
-    @Published private(set) var hasSeenOpening: Bool
 
     private let service: any ForecastService
     private let store: LocalForecastStore
@@ -19,17 +18,11 @@ final class ForecastSession: ObservableObject {
         self.service = service
         self.store = store
         self.now = now
-        hasSeenOpening = store.hasSeenOpening
         location = store.selectedLocation
         if let location, let saved = store.forecast(for: location, now: now()) {
             forecast = saved
             isShowingSavedForecast = true
         }
-    }
-
-    func finishOpening() {
-        store.hasSeenOpening = true
-        hasSeenOpening = true
     }
 
     func select(_ city: ForecastLocation) {

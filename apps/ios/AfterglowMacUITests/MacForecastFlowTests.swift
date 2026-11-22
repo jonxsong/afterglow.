@@ -14,6 +14,7 @@ final class MacForecastFlowTests: XCTestCase {
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 12))
+        XCTAssertTrue(window.buttons["opening.skip"].waitForExistence(timeout: 5))
         let search = window.textFields["location.search"]
         XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 10))
         XCTAssertTrue(window.buttons["location.current"].exists)
