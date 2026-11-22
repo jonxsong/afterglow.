@@ -29,6 +29,11 @@ final class CityForecastFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Best viewing window"].exists)
         capture("Tonight's sky")
 
+        app.buttons["forecast.home"].tap()
+        XCTAssertTrue(app.staticTexts["Where will you watch?"].waitForExistence(timeout: 5))
+        app.buttons["home.forecast"].tap()
+        XCTAssertTrue(app.staticTexts["Tonight’s sky"].waitForExistence(timeout: 5))
+
         let compare = app.buttons["forecast.compare"]
         if !compare.isHittable { app.swipeUp() }
         compare.tap()

@@ -2,6 +2,12 @@ import SwiftUI
 
 @MainActor
 struct AfterglowRootView: View {
+    private enum Screen {
+        case opening
+        case home
+        case forecast
+    }
+
     private enum Sheet: String, Identifiable {
         case location
         case privacy
@@ -15,28 +21,34 @@ struct AfterglowRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sheet: Sheet?
-    @State private var isShowingOpening = true
+    @State private var screen = Screen.opening
 
     var body: some View {
         Group {
-            if isShowingOpening {
+            switch screen {
+            case .opening:
                 OpeningSequenceView {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
-                        isShowingOpening = false
-                    }
+                    show(session.location == nil ? .home : .forecast)
                 }
                 .transition(.opacity)
-            } else if session.location == nil {
+            case .home:
                 cityPicker(asSheet: false)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        Button("Privacy") { sheet = .privacy }
-                            .font(.footnote)
-                            .padding(.vertical, 10)
+                        HStack(spacing: 20) {
+                            if session.location != nil {
+                                Button("Back to forecast") { show(.forecast) }
+                                    .accessibilityIdentifier("home.forecast")
+                            }
+                            Button("Privacy") { sheet = .privacy }
+                        }
+                        .font(.footnote)
+                        .padding(.vertical, 10)
                     }
                     .transition(.opacity)
-            } else {
+            case .forecast:
                 ForecastView(
                     session: session,
+                    onHome: { show(.home) },
                     onChangeCity: { sheet = .location },
                     onPrivacy: { sheet = .privacy }
                 )
@@ -68,6 +80,12 @@ struct AfterglowRootView: View {
         }
     }
 
+    private func show(_ destination: Screen) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
+            screen = destination
+        }
+    }
+
     private func cityPicker(asSheet: Bool) -> some View {
         LocationOnboardingView(
             purpose: asSheet ? .changeCity : .onboarding,
@@ -79,7 +97,11 @@ struct AfterglowRootView: View {
             subtitle: { $0.subtitle },
             onSelected: { location in
                 session.select(location)
-                if asSheet { sheet = nil }
+                if asSheet {
+                    sheet = nil
+                } else {
+                    show(.forecast)
+                }
             }
         )
     }

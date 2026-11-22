@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ForecastView: View {
     @ObservedObject var session: ForecastSession
+    let onHome: () -> Void
     let onChangeCity: () -> Void
     let onPrivacy: () -> Void
     @Environment(\.colorScheme) private var scheme
@@ -95,14 +96,23 @@ struct ForecastView: View {
 
     private var masthead: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image("BrandMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 27, height: 27)
-                .accessibilityHidden(true)
-            Text("afterglow.")
-                .font(.system(.title2, design: .serif))
-                .accessibilityLabel("Afterglow")
+            Button(action: onHome) {
+                HStack(spacing: 10) {
+                    Image("BrandMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 27, height: 27)
+                        .accessibilityHidden(true)
+                    Text("afterglow.")
+                        .font(.system(.title2, design: .serif))
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Afterglow home")
+            .accessibilityHint("Opens the location picker")
+            .accessibilityIdentifier("forecast.home")
             Spacer()
             Menu {
                 Button("Change location", systemImage: "location") { onChangeCity() }

@@ -31,6 +31,11 @@ final class MacForecastFlowTests: XCTestCase {
         XCTAssertTrue(window.staticTexts["Best viewing window"].exists)
         capture(window, as: "Afterglow-Mac-Forecast")
 
+        window.buttons["forecast.home"].click()
+        XCTAssertTrue(window.staticTexts["Where will you watch?"].waitForExistence(timeout: 5))
+        window.buttons["home.forecast"].click()
+        XCTAssertTrue(window.staticTexts["Tonight’s sky"].waitForExistence(timeout: 5))
+
         let compare = window.buttons["forecast.compare"]
         XCTAssertTrue(compare.waitForExistence(timeout: 5))
         if !compare.isHittable {
