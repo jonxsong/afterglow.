@@ -1,6 +1,6 @@
 # Afterglow for iPhone and Mac
 
-Afterglow uses SwiftUI and the same forecast API as [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev). Each fresh launch opens with a sunrise-to-sunset animation that resolves into the Afterglow logo. Home follows the intro and shows tonight’s viewing window for the saved city. Choose a location or open the detailed forecast, then tap the Afterglow logo to return to Home. The app works without sign-in.
+Afterglow uses SwiftUI and the same forecast API as [afterglow.jonzhang.dev](https://afterglow.jonzhang.dev). Each fresh launch opens with a sunrise-to-sunset animation that resolves into the Afterglow logo. Home carries the launch artwork into a full-screen sunset and shows tonight’s viewing window for the saved city. When a forecast is available, its predicted palette colors the sky. With Reduce Motion enabled, Home shows the settled sky. Choose a location or open the detailed forecast, then tap the Afterglow logo to return to Home. The app works without sign-in.
 
 `project.yml` defines both native apps and their XCTest targets. Generate the Xcode project before opening it.
 

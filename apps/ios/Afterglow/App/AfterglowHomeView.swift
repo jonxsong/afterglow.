@@ -1,45 +1,77 @@
 import SwiftUI
 
 struct AfterglowHomeView: View {
-    let location: ForecastLocation?
-    let forecast: WeeklyForecast?
+    @ObservedObject var session: ForecastSession
+    let showsSky: Bool
     let onViewForecast: () -> Void
     let onChooseLocation: () -> Void
     let onPrivacy: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
+    private var location: ForecastLocation? { session.location }
+
+    private var tonight: ForecastDay? {
+        let forecast = session.forecast
+        guard let forecast, let day = forecast.tonight,
+              ForecastCalendar.isToday(day, in: forecast.location.timeZone, now: .now)
+        else { return nil }
+        return day
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                welcome
+        let day = tonight
 
-                if let location {
-                    forecastPreview(for: location)
+        GeometryReader { viewport in
+            ScrollView {
+                VStack(spacing: 0) {
+                    welcome
+
+                    Spacer(minLength: 116)
+
+                    VStack(spacing: 14) {
+                        if let location {
+                            forecastPreview(for: location, day: day)
+                        }
+                        actions
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 36)
+                .padding(.bottom, 12)
+                .frame(maxWidth: 488)
+                .frame(minHeight: viewport.size.height)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .background { background(palette: day?.palette ?? []) }
+        .preferredColorScheme(.dark)
+    }
+
+    private func background(palette: [String]) -> some View {
+        GeometryReader { viewport in
+            ZStack(alignment: .top) {
+                SkyTheme.dusk
+
+                if showsSky {
+                    HomeSky(palette: palette)
+                        .frame(height: viewport.size.height * 0.82)
                 }
 
-                actions
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 28)
-            .frame(maxWidth: 488)
-            .frame(maxWidth: .infinity)
-        }
-        .background {
-            ZStack {
-                SkyTheme.background(for: colorScheme)
-                RadialGradient(
-                    colors: [
-                        colorScheme == .dark ? SkyTheme.rose.opacity(0.18) : SkyTheme.peach.opacity(0.44),
-                        .clear,
+                LinearGradient(
+                    stops: [
+                        .init(color: SkyTheme.dusk.opacity(0.60), location: 0),
+                        .init(color: SkyTheme.dusk.opacity(0.34), location: 0.26),
+                        .init(color: .clear, location: 0.5),
+                        .init(color: .clear, location: 0.64),
+                        .init(color: SkyTheme.dusk, location: 0.82),
                     ],
-                    center: .top,
-                    startRadius: 0,
-                    endRadius: 400
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
             }
-            .ignoresSafeArea()
         }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     private var welcome: some View {
@@ -63,23 +95,21 @@ struct AfterglowHomeView: View {
             if location == nil {
                 Text("Pick a place to see tonight’s sunset colors and when to watch.")
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.88))
                     .frame(maxWidth: 300)
             }
         }
         .multilineTextAlignment(.center)
+        .foregroundStyle(Color(red: 1, green: 0.97, blue: 0.92))
     }
 
-    private func forecastPreview(for location: ForecastLocation) -> some View {
+    private func forecastPreview(for location: ForecastLocation, day: ForecastDay?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(location.name, systemImage: "location")
                 .font(.subheadline.weight(.semibold))
                 .accessibilityIdentifier("home.city")
 
-            if let forecast, let day = forecast.tonight,
-               ForecastCalendar.isToday(day, in: forecast.location.timeZone, now: .now) {
-                SunsetScene(palette: day.palette, minutesFromSunset: 0, height: 152)
-
+            if let day {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Tonight’s best viewing window")
                         .font(.subheadline)
@@ -89,19 +119,29 @@ struct AfterglowHomeView: View {
                         .accessibilityIdentifier("home.viewingWindow")
                 }
 
-                ForecastSourceCredit(source: forecast.weatherSource)
+                if session.isShowingSavedForecast || session.forecast?.freshness?.source == .cache {
+                    Text("Saved forecast")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                ForecastSourceCredit(source: session.forecast?.weatherSource)
+                    .tint(SkyTheme.peach)
+            } else if session.isLoading {
+                ProgressView("Reading the evening sky…")
+                    .font(.subheadline)
             } else {
-                Text("Tonight’s preview isn’t available yet.")
+                Text("Forecast preview unavailable")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22))
+        .background(SkyTheme.dusk.opacity(0.84), in: .rect(cornerRadius: 22))
         .overlay {
             RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(SkyTheme.rose.opacity(0.18), lineWidth: 1)
+                .strokeBorder(.white.opacity(0.18), lineWidth: 1)
                 .allowsHitTesting(false)
         }
     }
@@ -114,11 +154,12 @@ struct AfterglowHomeView: View {
             Button(action: hasLocation ? onViewForecast : onChooseLocation) {
                 Text(primaryTitle)
                     .font(.headline)
+                    .foregroundStyle(SkyTheme.dusk)
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
-            .tint(SkyTheme.rose)
+            .tint(SkyTheme.peach)
             .accessibilityIdentifier(hasLocation ? "home.forecast" : "home.location")
 
             HStack(spacing: 24) {
@@ -140,7 +181,7 @@ struct AfterglowHomeView: View {
             }
             .buttonStyle(.plain)
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.84))
         }
     }
 }

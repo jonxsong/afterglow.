@@ -30,8 +30,8 @@ struct AfterglowRootView: View {
                 .transition(.opacity)
             } else {
                 AfterglowHomeView(
-                    location: session.location,
-                    forecast: session.forecast,
+                    session: session,
+                    showsSky: !isShowingOpening,
                     onViewForecast: { showForecast(true) },
                     onChooseLocation: { sheet = .location },
                     onPrivacy: { sheet = .privacy }

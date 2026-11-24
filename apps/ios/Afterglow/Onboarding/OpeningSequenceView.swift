@@ -117,9 +117,48 @@ struct OpeningSequenceView: View {
     }
 }
 
+struct HomeSky: View {
+    let palette: [String]
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var startedAt: Date?
+    @State private var isSettled = false
+
+    private let duration = 1.3
+
+    var body: some View {
+        // The forecast stores its warmest colors first, nearest the horizon.
+        let skyColors = Array(palette.compactMap(IntroColor.init(hex:)).reversed())
+        let isStatic = reduceMotion || isSettled
+
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: isStatic)) { timeline in
+            let elapsed = startedAt.map { timeline.date.timeIntervalSince($0) } ?? 0
+            let progress = isStatic ? 1 : introMix(0.90, 1, introEase(elapsed, from: 0, to: duration))
+            OpeningSky(dayProgress: progress, resolve: 0, sunsetPalette: skyColors)
+        }
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+        .task {
+            isSettled = reduceMotion
+            guard !isSettled else { return }
+
+            startedAt = .now
+            do {
+                try await Task.sleep(for: .seconds(duration))
+                isSettled = true
+            } catch is CancellationError {
+                // The artwork is no longer visible.
+            } catch {
+                isSettled = true
+            }
+        }
+    }
+}
+
 private struct OpeningSky: View {
     let dayProgress: Double
     let resolve: Double
+    var sunsetPalette: [IntroColor] = []
 
     private let dawn = IntroSky(zenith: 0x8E92BC, middle: 0xD9ACC0, horizon: 0xFFD2A0)
     private let daylight = IntroSky(zenith: 0x7CAACF, middle: 0xBED9E7, horizon: 0xFBE4C2)
@@ -128,15 +167,15 @@ private struct OpeningSky: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let sky = dayProgress < 0.5
-                ? dawn.mixed(with: daylight, amount: dayProgress * 2)
-                : daylight.mixed(with: sunset, amount: (dayProgress - 0.5) * 2)
+            let skyColors = dayProgress < 0.5
+                ? dawn.mixed(with: daylight, amount: dayProgress * 2).colors
+                : sunsetColors(amount: (dayProgress - 0.5) * 2)
             let sunX = introMix(0.18 + 0.61 * dayProgress, 0.5, resolve)
             let sunY = introMix(0.73 - sin(dayProgress * .pi) * 0.51, 0.62, resolve)
             let sunDiameter = min(size.width, size.height) * introMix(0.21, 0.30, resolve)
 
             ZStack {
-                LinearGradient(colors: sky.colors, startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: skyColors, startPoint: .top, endPoint: .bottom)
 
                 Circle()
                     .fill(IntroColor(0xFCE1B9).color)
@@ -169,6 +208,17 @@ private struct OpeningSky: View {
             }
         }
     }
+
+    private func sunsetColors(amount: Double) -> [Color] {
+        guard sunsetPalette.count >= 3 else {
+            return daylight.mixed(with: sunset, amount: amount).colors
+        }
+
+        return sunsetPalette.enumerated().map { index, color in
+            let position = Double(index) / Double(sunsetPalette.count - 1)
+            return daylight.color(at: position).mixed(with: color, amount: amount).color
+        }
+    }
 }
 
 private struct IntroSky {
@@ -187,6 +237,12 @@ private struct IntroSky {
     }
 
     var colors: [Color] { [zenith.color, middle.color, horizon.color] }
+
+    func color(at position: Double) -> IntroColor {
+        position < 0.5
+            ? zenith.mixed(with: middle, amount: position * 2)
+            : middle.mixed(with: horizon, amount: (position - 0.5) * 2)
+    }
 
     func mixed(with other: IntroSky, amount: Double) -> IntroSky {
         IntroSky(
@@ -208,6 +264,13 @@ private struct IntroColor {
             green: Double((hex >> 8) & 255) / 255,
             blue: Double(hex & 255) / 255
         )
+    }
+
+    init?(hex: String) {
+        let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard digits.count == 6, digits.allSatisfy(\.isHexDigit),
+              let value = UInt32(digits, radix: 16) else { return nil }
+        self.init(value)
     }
 
     private init(red: Double, green: Double, blue: Double) {

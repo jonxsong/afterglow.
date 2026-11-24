@@ -15,6 +15,7 @@ final class CityForecastFlowTests: XCTestCase {
         XCTAssertTrue(homeTitle.waitForExistence(timeout: 10))
         XCTAssertFalse(viewForecast.exists)
         XCTAssertFalse(XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch.exists)
+        capture("Home before choosing a city")
 
         chooseLocation.tap()
         XCTAssertTrue(app.buttons["location.current"].waitForExistence(timeout: 10))
