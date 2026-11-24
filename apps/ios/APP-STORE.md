@@ -31,7 +31,7 @@ After sunset, choose a photo from Finder and compare its colors with the forecas
 
 ### App Review notes
 
-On first launch, wait for the opening animation to finish or tap **Skip**. Search for San Francisco and choose the result to open the forecast. Drag **Time around sunset** to see the sky change, choose another date under **The week ahead**, or use **Compare a sunset photo** to select an image from Photos on iPhone or Finder on Mac. Manual city search works without location permission and there are no reviewer credentials.
+On first launch, wait for the opening animation to finish or tap **Skip**. From Home, tap **Choose a location**, search for San Francisco, and select it to open the forecast. On later launches, tap **View forecast** for the saved city. Drag **Time around sunset** to see the sky change, choose another date under **The week ahead**, or use **Compare a sunset photo** to select an image from Photos on iPhone or Finder on Mac. Manual city search works without location permission and there are no reviewer credentials.
 
 ## Prepare and submit
 

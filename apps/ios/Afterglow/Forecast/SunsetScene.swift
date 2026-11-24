@@ -3,8 +3,19 @@ import SwiftUI
 struct SunsetScene: View {
     let palette: [String]
     let minutesFromSunset: Double
+    private let height: CGFloat
 
     private let fallback = ["#F2B28D", "#DE918D", "#C47898", "#9475A5", "#625681"]
+
+    init(palette: [String], minutesFromSunset: Double, height: CGFloat? = nil) {
+        self.palette = palette
+        self.minutesFromSunset = minutesFromSunset
+        #if os(macOS)
+        self.height = height ?? 280
+        #else
+        self.height = height ?? 205
+        #endif
+    }
 
     var body: some View {
         let colors = palette.compactMap(SkyTheme.color)
@@ -51,11 +62,7 @@ struct SunsetScene: View {
                     .fill(SkyTheme.dusk)
             }
         }
-        #if os(macOS)
-        .frame(height: 280)
-        #else
-        .frame(height: 205)
-        #endif
+        .frame(height: height)
         .clipShape(.rect(cornerRadius: 24))
         .accessibilityHidden(true)
     }

@@ -111,7 +111,7 @@ struct ForecastView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Afterglow home")
-            .accessibilityHint("Opens the location picker")
+            .accessibilityHint("Returns to the forecast overview")
             .accessibilityIdentifier("forecast.home")
             Spacer()
             Menu {
@@ -165,7 +165,7 @@ struct ForecastView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                weatherAttribution(forecast.weatherSource)
+                ForecastSourceCredit(source: forecast.weatherSource)
             }
             Button {
                 comparingDay = day
@@ -177,23 +177,6 @@ struct ForecastView: View {
             .tint(SkyTheme.rose)
             .accessibilityIdentifier("forecast.compare")
         }
-    }
-
-    private func weatherAttribution(_ source: String?) -> some View {
-        let credit: LocalizedStringKey
-        switch source {
-        case "open-meteo":
-            credit = "Weather data from [Open-Meteo](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), adapted by Afterglow."
-        case "7timer":
-            credit = "Weather data from [7Timer (NOAA GFS)](https://www.7timer.info/), adapted by Afterglow."
-        default:
-            credit = "Afterglow adapts weather data from [Open-Meteo](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) or [7Timer (NOAA GFS)](https://www.7timer.info/)."
-        }
-
-        return Text(credit)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func freshnessLabel(_ forecast: WeeklyForecast) -> String? {

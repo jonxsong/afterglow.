@@ -16,29 +16,24 @@ struct AfterglowRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sheet: Sheet?
     @State private var isShowingOpening = true
-    @State private var isShowingHome = false
+    @State private var isShowingForecast = false
 
     var body: some View {
         Group {
-            if session.location == nil || isShowingHome {
-                cityPicker(asSheet: false)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        HStack(spacing: 20) {
-                            if session.location != nil {
-                                Button("Back to forecast") { showHome(false) }
-                                    .accessibilityIdentifier("home.forecast")
-                            }
-                            Button("Privacy") { sheet = .privacy }
-                        }
-                        .font(.footnote)
-                        .padding(.vertical, 10)
-                    }
-                    .transition(.opacity)
-            } else {
+            if isShowingForecast {
                 ForecastView(
                     session: session,
-                    onHome: { showHome(true) },
+                    onHome: { showForecast(false) },
                     onChangeCity: { sheet = .location },
+                    onPrivacy: { sheet = .privacy }
+                )
+                .transition(.opacity)
+            } else {
+                AfterglowHomeView(
+                    location: session.location,
+                    forecast: session.forecast,
+                    onViewForecast: { showForecast(true) },
+                    onChooseLocation: { sheet = .location },
                     onPrivacy: { sheet = .privacy }
                 )
                 .transition(.opacity)
@@ -65,7 +60,7 @@ struct AfterglowRootView: View {
             NavigationStack {
                 Group {
                     switch presentation {
-                    case .location: cityPicker(asSheet: true)
+                    case .location: cityPicker
                     case .privacy: PrivacyView()
                     }
                 }
@@ -85,15 +80,15 @@ struct AfterglowRootView: View {
         reduceMotion ? nil : .easeInOut(duration: 0.20)
     }
 
-    private func showHome(_ visible: Bool) {
+    private func showForecast(_ visible: Bool) {
         withAnimation(transitionAnimation) {
-            isShowingHome = visible
+            isShowingForecast = visible
         }
     }
 
-    private func cityPicker(asSheet: Bool) -> some View {
+    private var cityPicker: some View {
         LocationOnboardingView(
-            purpose: asSheet ? .changeCity : .onboarding,
+            purpose: session.location == nil ? .onboarding : .changeCity,
             search: { query in
                 try await service.searchCities(query, language: Locale.current.language.languageCode?.identifier ?? "en")
             },
@@ -102,11 +97,8 @@ struct AfterglowRootView: View {
             subtitle: { $0.subtitle },
             onSelected: { location in
                 session.select(location)
-                if asSheet {
-                    sheet = nil
-                } else {
-                    showHome(false)
-                }
+                sheet = nil
+                showForecast(true)
             }
         )
     }

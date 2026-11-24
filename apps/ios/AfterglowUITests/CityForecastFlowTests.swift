@@ -2,15 +2,22 @@ import XCTest
 
 final class CityForecastFlowTests: XCTestCase {
     @MainActor
-    func testChooseCityThenReopenTheForecastWithoutAnAccount() {
+    func testHomeChooseCityThenReopenTheSavedForecast() {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-city-flow", "--ui-test-reset"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Where will you watch?"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["location.current"].exists)
+        let homeTitle = app.staticTexts["View the golden hour"]
+        let chooseLocation = app.buttons["home.location"]
+        let viewForecast = app.buttons["home.forecast"]
+        let viewingWindow = app.staticTexts["home.viewingWindow"]
+        XCTAssertTrue(homeTitle.waitForExistence(timeout: 10))
+        XCTAssertFalse(viewForecast.exists)
         XCTAssertFalse(XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch.exists)
+
+        chooseLocation.tap()
+        XCTAssertTrue(app.buttons["location.current"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Tonight’s sky"].exists)
         capture("Location choice")
 
@@ -28,8 +35,10 @@ final class CityForecastFlowTests: XCTestCase {
         capture("Tonight's sky")
 
         app.buttons["forecast.home"].tap()
-        XCTAssertTrue(app.staticTexts["Where will you watch?"].waitForExistence(timeout: 5))
-        app.buttons["home.forecast"].tap()
+        XCTAssertTrue(homeTitle.waitForExistence(timeout: 5))
+        XCTAssertTrue(viewingWindow.waitForExistence(timeout: 5))
+        capture("Home with a saved city")
+        viewForecast.tap()
         XCTAssertTrue(app.staticTexts["Tonight’s sky"].waitForExistence(timeout: 5))
 
         let compare = app.buttons["forecast.compare"]
@@ -45,9 +54,12 @@ final class CityForecastFlowTests: XCTestCase {
         let skipOpening = app.buttons["opening.skip"]
         XCTAssertTrue(skipOpening.waitForExistence(timeout: 5))
         skipOpening.tap()
-        XCTAssertTrue(app.staticTexts["Tonight’s sky"].waitForExistence(timeout: 10))
+        XCTAssertTrue(homeTitle.waitForExistence(timeout: 10))
+        XCTAssertTrue(viewingWindow.waitForExistence(timeout: 5))
         XCTAssertFalse(skipOpening.exists)
-        XCTAssertFalse(app.staticTexts["Where will you watch?"].exists)
+        XCTAssertFalse(app.textFields["location.search"].exists)
+        viewForecast.tap()
+        XCTAssertTrue(app.staticTexts["Tonight’s sky"].waitForExistence(timeout: 5))
     }
 
     @MainActor

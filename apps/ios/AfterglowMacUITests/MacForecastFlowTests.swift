@@ -2,7 +2,7 @@ import XCTest
 
 final class MacForecastFlowTests: XCTestCase {
     @MainActor
-    func testCityForecastAndPhotoPicker() {
+    func testHomeCityForecastAndPhotoPicker() {
         continueAfterFailure = false
 
         let app = XCUIApplication()
@@ -13,16 +13,21 @@ final class MacForecastFlowTests: XCTestCase {
         ]
         app.launch()
 
-        let search = app.textFields["location.search"]
-        XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 15))
+        let chooseLocation = app.buttons["home.location"]
+        XCTAssertTrue(chooseLocation.wait(for: \.isHittable, toEqual: true, timeout: 15))
         let window = app.windows.firstMatch
         XCTAssertTrue(window.exists)
-        XCTAssertTrue(window.buttons["location.current"].exists)
+        XCTAssertFalse(window.buttons["home.forecast"].exists)
+
+        chooseLocation.click()
+        let search = app.textFields["location.search"]
+        XCTAssertTrue(search.wait(for: \.isHittable, toEqual: true, timeout: 10))
+        XCTAssertTrue(app.buttons["location.current"].exists)
         capture(window, as: "Afterglow-Mac-Location")
 
         search.click()
         search.typeText("San Francisco")
-        let city = window.buttons.matching(identifier: "location.city-result").firstMatch
+        let city = app.buttons.matching(identifier: "location.city-result").firstMatch
         XCTAssertTrue(city.wait(for: \.isHittable, toEqual: true, timeout: 10))
         city.click()
 
@@ -32,7 +37,9 @@ final class MacForecastFlowTests: XCTestCase {
         capture(window, as: "Afterglow-Mac-Forecast")
 
         window.buttons["forecast.home"].click()
-        XCTAssertTrue(window.staticTexts["Where will you watch?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(window.staticTexts["View the golden hour"].waitForExistence(timeout: 5))
+        XCTAssertTrue(window.staticTexts["home.viewingWindow"].waitForExistence(timeout: 5))
+        capture(window, as: "Afterglow-Mac-Home")
         window.buttons["home.forecast"].click()
         XCTAssertTrue(window.staticTexts["Tonight’s sky"].waitForExistence(timeout: 5))
 
